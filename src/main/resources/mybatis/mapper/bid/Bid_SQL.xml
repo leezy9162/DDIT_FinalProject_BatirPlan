@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.bid.mapper.IBidMapper">
+    
+    <sql id="bidSearch">
+    	<if test="searchWord != null">
+    		and pblanc_sj like '%'||#{searchWord}||'%'
+    	</if>
+    </sql>
+    
+    <select id="findAllBids" resultType="kr.or.batirplan.bid.vo.BidVO">
+	    SELECT 
+	          pblanc_no						/* 공고 번호 */
+	        , prjct_no						/* 프로젝트 번호 */
+	        , pblanc_sj						/* 공고 제목 */
+	        , pblanc_bgnde					/* 공고 번호 */
+	        , pblanc_endde					/* 공고 종료일 */
+	        , pblanc_se						/* 공고 구분 */
+	        , progrs_sttus					/* 공고 진행 상태 */
+	    FROM tb_bid_public_announcement		
+	</select>
+
+    <select id="countBids" parameterType="string" resultType="int">
+        SELECT COUNT(*) 
+        FROM tb_bid_public_announcement
+        WHERE pblanc_sj LIKE '%' || #{searchWord} || '%'
+    </select>
+
+    <select id="findBidsWithPagination" parameterType="map" resultType="kr.or.batirplan.bid.vo.BidVO">
+	    SELECT 
+	          pblanc_no
+	        , prjct_no
+	        , pblanc_sj
+	        , pblanc_bgnde
+	        , pblanc_endde
+	        , pblanc_se
+	        , progrs_sttus
+	    FROM tb_bid_public_announcement
+	    WHERE pblanc_sj LIKE '%' || #{searchWord} || '%'
+	    ORDER BY pblanc_no DESC
+	    OFFSET #{startRow} ROWS FETCH NEXT #{screenSize} ROWS ONLY
+	</select>
+	
+	<select id="selectBidDetail" parameterType="string" resultType="kr.or.batirplan.bid.vo.BidVO">
+	    SELECT 
+	          pblanc_no
+	        , prjct_no
+	        , procs_no
+	        , pblanc_wrter
+	        , pblanc_se
+	        , pblanc_sj
+	        , demand_cnd_cn
+	        , pblanc_amount
+	        , pblanc_bgnde
+	        , pblanc_endde
+	        , progrs_sttus
+	    FROM tb_bid_public_announcement
+	    WHERE pblanc_no = #{pblancNo}
+	</select>
+
+	<!-- 여기서부터는 선생님하고 했던 쿼리들이야 -->
+	<!-- 전체 게시글 수를 가져오는 쿼리 그룹 -->
+	<select id="selectBidsWithCount" parameterType="kr.or.batirplan.common.vo.PaginationInfoVO" resultType="int">
+		select count(pblanc_no) 
+		from tb_bid_public_announcement
+		where 1=1
+		<include refid="bidSearch"/>
+	</select>
+	
+	<!-- 전체 게시글 중, 1페이지에 해당하는 게시글 총 10개 가져오는 쿼리 그룹 -->
+	<select id="selectBidsWithList" parameterType="kr.or.batirplan.common.vo.PaginationInfoVO" resultType="kr.or.batirplan.bid.vo.BidVO">
+		select b.* 
+		from(
+			select a.*, row_number() over(order by a.pblanc_no desc) rnum 
+			from (
+			    SELECT 
+			          pblanc_no						/* 공고 번호 */
+			        , prjct_no						/* 프로젝트 번호 */
+			        , pblanc_sj						/* 공고 제목 */
+			        , (select EMPL_NM from tb_employee where pblanc_wrter = empl_code) as pblanc_wrter
+			        , pblanc_bgnde					/* 공고 번호 */
+			        , pblanc_endde					/* 공고 종료일 */
+			        , pblanc_se						/* 공고 구분 */
+			        , progrs_sttus					/* 공고 진행 상태 */
+			    FROM tb_bid_public_announcement
+			    where 1=1
+				<include refid="bidSearch"/>
+				order by pblanc_no desc
+			) a
+		) b 
+		<![CDATA[
+			where rnum >= #{startRow} and rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<select id="selectBidWithAllList" resultType="kr.or.batirplan.bid.vo.BidVO">
+		SELECT 
+	          pblanc_no						/* 공고 번호 */
+	        , prjct_no						/* 프로젝트 번호 */
+	        , pblanc_sj						/* 공고 제목 */
+	        , (select EMPL_NM from tb_employee where pblanc_wrter = empl_code) as pblanc_wrter
+	        , pblanc_bgnde					/* 공고 번호 */
+	        , pblanc_endde					/* 공고 종료일 */
+	        , pblanc_se						/* 공고 구분 */
+	        , progrs_sttus					/* 공고 진행 상태 */
+	    FROM tb_bid_public_announcement
+	</select>
+	
+</mapper>

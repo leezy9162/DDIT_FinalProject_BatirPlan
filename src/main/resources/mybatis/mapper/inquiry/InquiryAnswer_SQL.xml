@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.inquiry.mapper.IInquiryAnswerMapper">
+
+    <insert id="addAnswer" parameterType="kr.or.batirplan.inquiry.vo.InquiryAnswerVO">
+	    INSERT INTO tb_inquiry_answer (
+	    	answer_no			/* 답변 번호 */
+	    	, inqry_no			/* 문의 번호 */
+	    	, answrr			/* 답변자 사원 코드 */
+	    	, answer_cn			/* 답변 내용 */
+	    	, answer_regist_dt)	/* 답변 등록 일시 */
+	    VALUES (
+	    	(SELECT NVL(max(answer_no), 0) + 1 FROM tb_inquiry_answer)
+	    	, #{inqryNo}
+	    	, #{answrr}
+	    	, #{answerCn}
+	    	, sysdate)
+	</insert>
+
+    <select id="getAnswers" resultType="kr.or.batirplan.inquiry.vo.InquiryAnswerVO">
+	    SELECT 
+	    	answer_no			/* 답변 번호 */
+	    	, inqry_no			/* 문의 번호 */
+	    	, answrr			/* 답변자 사원 코드 */
+	    	, answer_cn			/* 답변 내용 */
+	    	, answer_regist_dt	/* 답변 등록 일시 */
+	    FROM tb_inquiry_answer
+	    WHERE inqry_no = #{inqryNo}
+	    ORDER BY answer_regist_dt ASC
+	</select>
+	
+	<update id="updateAnswer" parameterType="kr.or.batirplan.inquiry.vo.InquiryAnswerVO">
+	    UPDATE tb_inquiry_answer
+	    SET answer_cn = #{answerCn}
+	    WHERE answer_no = #{answerNo}
+	</update>
+	
+	<delete id="deleteAnswer" parameterType="int">
+	    DELETE FROM tb_inquiry_answer WHERE answer_no = #{answerNo}
+	</delete>
+	
+	<delete id="deleteAllAnswer" parameterType="int">
+	    DELETE FROM tb_inquiry_answer WHERE inqry_no = #{inqryNo}
+	</delete>
+
+</mapper>

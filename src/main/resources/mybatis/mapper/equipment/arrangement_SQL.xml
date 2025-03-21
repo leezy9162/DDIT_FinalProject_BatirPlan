@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.equipment.mapper.EquipmentArrangementMapper">
+
+    <!-- 배치 신청 정보 매핑 -->
+    <resultMap id="EquipmentArrangementResultMap" type="kr.or.batirplan.equipment.vo.EquipmentArrangementVO">
+        <id property="requestNo" column="REQUEST_NO"/>
+        <result property="prjctNo" column="PRJCT_NO"/>
+        <result property="prjctNm" column="PRJCT_NM"/>
+        <result property="prjctLc" column="PRJCT_LC"/>
+        <result property="emplCode" column="EMPL_CODE"/>
+        <result property="emplNm" column="EMPL_NM"/>
+        <result property="eqpmnNo" column="EQPMN_NO"/>
+        <result property="eqpmnNm" column="EQPMN_NM"/>
+        <result property="eqpmnTy" column="EQPMN_TY"/>
+        <result property="eqpmnSn" column="EQPMN_SN"/>
+        <result property="makrNm" column="MAKR_NM"/>
+        <result property="requestDate" column="REQUEST_DATE"/>
+        <result property="approvalStatus" column="APPROVAL_STATUS"/>
+        <result property="rentalStartDate" column="RENTAL_START_DATE"/>
+        <result property="rentalEndDate" column="RENTAL_END_DATE"/>
+        <result property="arrangementReason" column="ARRANGEMENT_REASON"/> 
+    </resultMap>
+    
+    
+    <!-- 프로젝트 검색 -->
+    <resultMap id="ProjectResultMap" type="kr.or.batirplan.project.projectmanage.vo.ProjectVO">
+        <id property="prjctNo" column="PRJCT_NO"/>
+        <result property="prjctNm" column="PRJCT_NM"/>
+        <result property="prjctLc" column="PRJCT_LC"/>
+    </resultMap>
+    
+
+    <!--  배치 신청 목록 조회 -->
+	 <select id="getEquipmentArrangementList" resultMap="EquipmentArrangementResultMap">
+	    SELECT 
+	        REQ.REQUEST_NO, PRJ.PRJCT_NM, EMP.EMPL_NM, EQ.EQPMN_NM, 
+	        REQ.RENTAL_START_DATE, REQ.RENTAL_END_DATE, REQ.REQUEST_DATE, REQ.APPROVAL_STATUS
+	    FROM TB_EQUIPMENT_ARRANGEMENT_REQUEST REQ
+	    JOIN TB_PROJECT PRJ ON REQ.PRJCT_NO = PRJ.PRJCT_NO
+	    JOIN TB_EMPLOYEE EMP ON REQ.EMPL_CODE = EMP.EMPL_CODE
+	    JOIN TB_EQUIPMENT EQ ON REQ.EQPMN_NO = EQ.EQPMN_NO
+	    WHERE 1=1
+	    <if test="searchType != null and searchKeyword != null">
+	        <choose>
+	            <when test="searchType == 'project'">
+	                AND PRJ.PRJCT_NM LIKE '%' || #{searchKeyword} || '%'
+	            </when>
+	            <when test="searchType == 'employee'">
+	                AND EMP.EMPL_NM LIKE '%' || #{searchKeyword} || '%'
+	            </when>
+	            <when test="searchType == 'equipment'">
+	                AND EQ.EQPMN_NM LIKE '%' || #{searchKeyword} || '%'
+	            </when>
+	        </choose>
+	    </if>
+	    <if test="approvalStatus != null and approvalStatus != ''">
+	        AND REQ.APPROVAL_STATUS = #{approvalStatus}
+	    </if>
+	    ORDER BY REQ.REQUEST_DATE DESC
+	</select>
+
+	<select id="getPendingEquipmentArrangementList" resultMap="EquipmentArrangementResultMap">
+	    SELECT 
+	        REQ.REQUEST_NO, REQ.PRJCT_NO, PRJ.PRJCT_NM, PRJ.PRJCT_LC, 
+	        REQ.EMPL_CODE, EMP.EMPL_NM, EQ.EQPMN_NO, EQ.EQPMN_NM, 
+	        EQ.EQPMN_TY, EQ.EQPMN_SN, EQ.MAKR_NM, 
+	        REQ.REQUEST_DATE, REQ.APPROVAL_STATUS, REQ.RENTAL_START_DATE, REQ.RENTAL_END_DATE
+	    FROM TB_EQUIPMENT_ARRANGEMENT_REQUEST REQ
+	    JOIN TB_PROJECT PRJ ON REQ.PRJCT_NO = PRJ.PRJCT_NO
+	    JOIN TB_EMPLOYEE EMP ON REQ.EMPL_CODE = EMP.EMPL_CODE
+	    JOIN TB_EQUIPMENT EQ ON REQ.EQPMN_NO = EQ.EQPMN_NO
+	    WHERE REQ.APPROVAL_STATUS IN ('D', 'Y', 'N')  <!-- 🔥 '대기', '승인', '미승인' 모두 표시 -->
+	    ORDER BY REQ.REQUEST_DATE DESC
+	</select>
+
+    <!-- 배치 신청 상세 조회 -->
+    <select id="getEquipmentArrangementDetail" parameterType="int" resultMap="EquipmentArrangementResultMap">
+        SELECT 
+            REQ.REQUEST_NO, REQ.PRJCT_NO, PRJ.PRJCT_NM, PRJ.PRJCT_LC, 
+            REQ.EMPL_CODE, EMP.EMPL_NM, EQ.EQPMN_NO, EQ.EQPMN_NM, 
+            EQ.EQPMN_TY, EQ.EQPMN_SN, EQ.MAKR_NM, 
+            REQ.REQUEST_DATE, REQ.APPROVAL_STATUS, REQ.RENTAL_START_DATE, REQ.RENTAL_END_DATE,
+            REQ.ARRANGEMENT_REASON
+        FROM TB_EQUIPMENT_ARRANGEMENT_REQUEST REQ
+        JOIN TB_PROJECT PRJ ON REQ.PRJCT_NO = PRJ.PRJCT_NO
+        JOIN TB_EMPLOYEE EMP ON REQ.EMPL_CODE = EMP.EMPL_CODE
+        JOIN TB_EQUIPMENT EQ ON REQ.EQPMN_NO = EQ.EQPMN_NO
+        WHERE REQ.REQUEST_NO = #{requestNo}
+    </select>
+
+    <!-- 승인 처리: 배치 신청 승인 -->
+    <update id="approveEquipmentArrangement">
+        UPDATE TB_EQUIPMENT_ARRANGEMENT_REQUEST 
+        SET APPROVAL_STATUS = 'Y'
+        WHERE REQUEST_NO = #{requestNo}
+    </update>
+
+    <!-- 승인 후, 장비 상태를 사용중('02')로 변경 -->
+    <update id="updateEquipmentStatus">
+        UPDATE TB_EQUIPMENT 
+        SET EQPMN_STTUS = '02'
+        WHERE EQPMN_NO = #{eqpmnNo}
+    </update>
+	
+	<update id="rejectEquipmentArrangement">
+	    UPDATE TB_EQUIPMENT_ARRANGEMENT_REQUEST 
+	    SET APPROVAL_STATUS = 'N'
+	    WHERE REQUEST_NO = #{requestNo}
+	</update>
+
+    <!-- 신규 배치 신청 등록 -->
+    <insert id="insertEquipmentArrangement">
+	    INSERT INTO TB_EQUIPMENT_ARRANGEMENT_REQUEST (
+	        REQUEST_NO, PRJCT_NO, EMPL_CODE, EQPMN_NO, REQUEST_DATE, APPROVAL_STATUS, RENTAL_START_DATE, RENTAL_END_DATE, ARRANGEMENT_REASON
+	    ) VALUES (
+	        SEQ_EQUIPMENT_ARRANGEMENT.NEXTVAL, #{prjctNo}, #{emplCode}, #{eqpmnNo}, SYSDATE, 'D', #{rentalStartDate}, #{rentalEndDate}, #{arrangementReason}
+	    )
+	</insert>
+
+	<!-- 프로젝트 검색 -->
+    <select id="searchProject" parameterType="string" resultMap="ProjectResultMap">
+        SELECT PRJCT_NO, PRJCT_NM, PRJCT_LC 
+	    FROM TB_PROJECT 
+	    WHERE PRJCT_NO LIKE '%' || #{keyword} || '%' 
+	       OR PRJCT_NM LIKE '%' || #{keyword} || '%' 
+    </select>
+    
+    
+    
+	 <!-- 신청자(사원) 검색 및 전체 조회 -->
+	<select id="searchEmployee" parameterType="string" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+	    SELECT 
+        a.empl_code AS emplCode, 
+        a.empl_nm AS emplNm, 
+        a.dept_code AS deptCode, 
+        b.dept_nm AS deptNm, 
+        a.clsf_code AS clsfCode, 
+        c.code_nm AS clsfNm
+    FROM TB_EMPLOYEE a
+    JOIN TB_DEPARTMENT b ON a.dept_code = b.dept_code
+    JOIN TB_COMMONNESS_CODE c ON a.clsf_code = c.code AND c.group_code = 'RANK'
+    WHERE a.hffc_sttus = '01'
+      AND (a.empl_nm LIKE '%' || #{keyword} || '%' 
+           OR b.dept_nm LIKE '%' || #{keyword} || '%' 
+           OR c.code_nm LIKE '%' || #{keyword} || '%')
+    ORDER BY b.dept_code, c.code_nm, a.empl_nm
+	</select>
+
+<update id="cancelApproval">
+    UPDATE TB_EQUIPMENT_ARRANGEMENT_REQUEST 
+    SET APPROVAL_STATUS = 'D'  
+    WHERE REQUEST_NO = #{requestNo}
+</update>
+ 
+
+</mapper>

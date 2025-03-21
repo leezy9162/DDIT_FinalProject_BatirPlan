@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.inquiry.mapper.IInquiryMapper">
+
+	<sql id="inquirySearch">
+		<if test="searchType == null or searchType == '' or searchType == 'all'">
+		    AND (
+		        LOWER(i.sj) LIKE '%' || LOWER(#{searchWord}) || '%'
+		        OR LOWER(i.cn) LIKE '%' || LOWER(#{searchWord}) || '%'
+		        OR LOWER(e.empl_nm) LIKE '%' || LOWER(#{searchWord}) || '%'
+		    )
+		</if>
+	    <if test="searchType != null and searchType == 'sj'">
+	        AND LOWER(i.sj) LIKE '%' || LOWER(#{searchWord}) || '%'
+	    </if>
+	    <if test="searchType != null and searchType == 'wrter'">
+	        AND LOWER(e.empl_nm) LIKE '%' || LOWER(#{searchWord}) || '%'
+	    </if>
+	    <if test="searchType != null and searchType == 'cn'">
+	        AND LOWER(i.cn) LIKE '%' || LOWER(#{searchWord}) || '%'
+	    </if>
+	    <if test="searchType != null and searchType == 'all'">
+	        AND (
+	            LOWER(i.sj) LIKE '%' || LOWER(#{searchWord}) || '%'
+	            OR LOWER(i.cn) LIKE '%' || LOWER(#{searchWord}) || '%'
+	            OR LOWER(e.empl_nm) LIKE '%' || LOWER(#{searchWord}) || '%'
+	        )
+	    </if>
+	</sql>
+
+	<select id="list" resultType="kr.or.batirplan.inquiry.vo.InquiryVO">
+	    SELECT 
+	    	i.inqry_no				/* 문의 번호 */
+	    	, i.ty					/* 유형 */
+	    	, i.sj					/* 제목 */
+	    	, e.empl_code AS wrter	/* 작성자 사원 코드 */
+	    	, i.writng_dt,			/* 작성일시 */
+	           CASE 
+	               WHEN (SELECT COUNT(*) FROM tb_inquiry_answer a WHERE a.inqry_no = i.inqry_no) > 0 THEN '답변완료'
+	               ELSE '답변대기'
+	           END AS answer_status
+	    FROM tb_inquiry i
+	    JOIN tb_employee e ON i.wrter = e.empl_code
+	    ORDER BY i.inqry_no DESC
+	</select>
+
+	<select id="searchInquiries" parameterType="string" resultType="kr.or.batirplan.inquiry.vo.InquiryVO">
+	    SELECT 
+	    	i.inqry_no				/* 문의 번호 */
+	    	, i.ty					/* 유형 */
+	    	, i.sj					/* 제목 */
+	    	, e.empl_code AS wrter	/* 작성자 사원 코드 */
+	    	, i.writng_dt,			/* 작성일시 */
+	           CASE 
+	               WHEN (SELECT COUNT(*) FROM tb_inquiry_answer a WHERE a.inqry_no = i.inqry_no) > 0 THEN '답변완료'
+	               ELSE '답변대기'
+	           END AS answer_status
+	    FROM tb_inquiry i
+	    JOIN tb_employee e ON i.wrter = e.empl_code
+	    WHERE LOWER(i.sj) LIKE '%' || LOWER(#{searchKeyword}) || '%'
+	       OR LOWER(i.cn) LIKE '%' || LOWER(#{searchKeyword}) || '%'
+	       OR LOWER(e.empl_nm) LIKE '%' || LOWER(#{searchKeyword}) || '%'
+	    ORDER BY i.writng_dt DESC
+	</select>
+
+    <insert id="register" parameterType="kr.or.batirplan.inquiry.vo.InquiryVO">
+        INSERT INTO tb_inquiry (
+        	inqry_no				/* 문의 번호 */
+        	, ty					/* 유형 */
+        	, sj					/* 제목 */
+        	, wrter					/* 작성자 사원 코드 */
+        	, cn					/* 내용 */
+        	, writng_dt				/* 작성일시 */
+        	, progrs_sttus)			/* 진행상태 */
+        VALUES (
+        	seq_tb_inquiry.nextval
+        	, #{ty}					
+        	, #{sj}					
+        	, #{wrter}				
+        	, #{cn}					
+        	, sysdate				
+        	, NVL(#{progrsSttus}
+        	, '01'))
+    </insert>
+
+    <!-- <select id="read" parameterType="int" resultType="kr.or.batirplan.inquiry.vo.InquiryVO">
+        SELECT 
+        	inqry_no				/* 문의 번호 */
+        	, ty					/* 유형 */
+        	, sj					/* 제목 */
+        	, wrter					/* 작성자 사원 코드 */
+        	, cn					/* 내용 */
+        	, writng_dt				/* 작성일시 */
+        FROM tb_inquiry
+        WHERE inqry_no = #{inqryNo}
+    </select> -->
+    
+    <select id="read" parameterType="int" resultType="kr.or.batirplan.inquiry.vo.InquiryVO">
+        SELECT 
+        	i.inqry_no				/* 문의 번호 */
+        	, i.ty					/* 유형 */
+        	, i.sj					/* 제목 */
+        	, e.empl_code AS wrter	/* 작성자 사원 코드 */
+        	, i.cn					/* 내용 */
+        	, i.writng_dt				/* 작성일시 */
+        FROM tb_inquiry i
+		JOIN tb_employee e ON i.wrter = e.empl_code
+        WHERE inqry_no = #{inqryNo}
+    </select>
+
+    <update id="update" parameterType="kr.or.batirplan.inquiry.vo.InquiryVO">
+        UPDATE tb_inquiry
+        SET ty = NVL(#{ty}, ty),
+            sj = #{sj},
+            cn = #{cn},
+            progrs_sttus = NVL(#{progrsSttus}, progrs_sttus)
+        WHERE inqry_no = #{inqryNo}
+    </update>
+
+    <delete id="remove" parameterType="int">
+        DELETE FROM tb_inquiry WHERE inqry_no = #{inqryNo}
+    </delete>
+    
+    <select id="selectInquiryCount" parameterType="kr.or.batirplan.common.vo.PaginationInfoVO" resultType="int">
+	    SELECT count(i.inqry_no)
+	    FROM tb_inquiry i
+	    JOIN tb_employee e ON i.wrter = e.empl_code
+	    WHERE 1=1
+	    <if test="searchType != null and searchType == 'sj'">
+	        AND LOWER(i.sj) LIKE '%' || LOWER(#{searchWord}) || '%'
+	    </if>
+	    <if test="searchType != null and searchType == 'cn'">
+	        AND LOWER(i.cn) LIKE '%' || LOWER(#{searchWord}) || '%'
+	    </if>
+	    <if test="searchType != null and searchType == 'wrter'">
+	        AND LOWER(e.empl_nm) LIKE '%' || LOWER(#{searchWord}) || '%'
+	    </if>
+	    <if test="searchType != null and searchType == 'all'">
+	        AND (
+	            LOWER(i.sj) LIKE '%' || LOWER(#{searchWord}) || '%'
+	            OR LOWER(i.cn) LIKE '%' || LOWER(#{searchWord}) || '%'
+	            OR LOWER(e.empl_nm) LIKE '%' || LOWER(#{searchWord}) || '%'
+	        )
+	    </if>
+	</select>
+    
+    <select id="selectInquiryList">
+    	SELECT
+			b.*
+		FROM (
+			SELECT
+				a.*, row_number() over(order by a.inqry_no desc) rnum
+			FROM(
+				 SELECT i.inqry_no, i.ty, i.sj, e.empl_nm AS wrter, i.writng_dt,
+                       (CASE 
+                           WHEN (SELECT COUNT(*) FROM tb_inquiry_answer a WHERE a.inqry_no = i.inqry_no) > 0 THEN '답변완료'
+                           ELSE '답변대기'
+                       END) AS answer_status
+                FROM tb_inquiry i
+                JOIN tb_employee e ON i.wrter = e.empl_code
+                WHERE 1=1
+	    		<include refid="inquirySearch"/>
+                ORDER BY i.inqry_no DESC
+			) a
+		) b
+		<![CDATA[
+			WHERE b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+    </select>
+    
+</mapper>

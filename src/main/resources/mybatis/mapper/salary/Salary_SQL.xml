@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.fnnr.salary.mapper.ISalaryMapper">
+
+    <!-- 전체 급여 목록 조회 -->
+    <select id="getAllSalaries" resultType="kr.or.batirplan.fnnr.salary.vo.SalaryVO">
+        SELECT
+        	e.empl_code					/* 사원 코드 */
+        	, e.empl_nm AS emplName		/* 사원명 */
+        	, c.clsf_nm AS clsfNm		/* 직급명 */
+        	, c.salary AS pymntAmount	/* 지급 금액 */
+        	, s.salary_ym AS salaryYm	/* 급여 연월 */
+        FROM tb_employee e
+        JOIN tb_class_of_position c ON e.clsf_code = c.clsf_code
+        LEFT JOIN tb_salary_payment_history s ON e.empl_code = s.empl_code
+        WHERE s.salary_ym = #{salaryYm}
+    </select>
+
+    <!-- 미지급 직원 조회 -->
+    <select id="getUnpaidEmployees" resultType="kr.or.batirplan.fnnr.salary.vo.SalaryVO">
+	    SELECT
+	    	   #{salaryYm} AS salaryYm		/* 급여 연월 */
+	           , e.empl_code 				/* 사원 코드 */
+	           , e.empl_nm AS emplName 		/* 사원명 */
+	           , c.clsf_nm AS clsfNm 		/* 직급명 */
+	           , c.salary AS pymntAmount	/* 지급 금액 */
+	    FROM tb_employee e
+	    JOIN tb_class_of_position c ON e.clsf_code = c.clsf_code
+	    WHERE e.empl_code NOT IN (
+	        SELECT empl_code FROM tb_salary_payment_history WHERE salary_ym = #{salaryYm}
+	    )
+	</select>
+
+    <!-- 지급된 직원 조회 -->
+    <select id="getPaidEmployees" resultType="kr.or.batirplan.fnnr.salary.vo.SalaryVO">
+	    SELECT
+	    	s.salary_ym						/* 급여 연월 */
+	    	, e.empl_code					/* 사원 코드 */
+	    	, e.empl_nm AS emplName			/* 사원명 */
+	    	, c.clsf_nm AS clsfNm			/* 직급명 */
+	    	, s.pymnt_amount AS pymntAmount	/* 지급 금액 */
+	    FROM tb_salary_payment_history s
+	    JOIN tb_employee e ON s.empl_code = e.empl_code
+	    JOIN tb_class_of_position c ON e.clsf_code = c.clsf_code
+	    WHERE s.salary_ym = #{salaryYm}
+	</select>
+
+    <!-- 급여 지급 여부 확인 -->
+    <select id="countSalaryPayments" resultType="int">
+        SELECT count(*) FROM tb_salary_payment_history
+        WHERE salary_ym = #{salaryYm} AND empl_code = #{emplCode}
+    </select>
+
+    <!-- 급여 지급 처리 -->
+    <insert id="processSalaryPayment">
+        INSERT INTO tb_salary_payment_history (salary_ym, empl_code, pymnt_amount, pymnt_de)
+        SELECT
+        	#{salaryYm}									/* 급여 연월 */
+        	, e.empl_code								/* 사원 코드 */
+        	, c.salary									/* 급여 */
+        	, to_char(current_timestamp, 'YYYYMMDD')
+        FROM tb_employee e
+        JOIN tb_class_of_position c ON e.clsf_code = c.clsf_code
+        WHERE e.empl_code = #{emplCode}
+        AND NOT EXISTS (
+            SELECT 1 FROM tb_salary_payment_history 
+            WHERE salary_ym = #{salaryYm} 
+            AND empl_code = #{emplCode}
+        )
+    </insert>
+
+</mapper>

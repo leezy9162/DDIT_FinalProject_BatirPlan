@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.electronicdocument.mapper.IElectronicDocumentMapper">
+
+    <select id="selectDocumentList" parameterType="map" resultType="kr.or.batirplan.electronicdocument.vo.DocumentVO">
+	    SELECT
+	        d.doc_no,
+	        d.drft_de,
+	        d.tmlmt_de,
+	        d.sj,
+	        d.drafter,
+	        e.empl_nm AS drafter_name,
+	        d.sttus,
+	        d.emrgncy_doc_at,
+	        COALESCE(
+	            (
+	                SELECT e2.empl_nm
+	                FROM tb_sanction_line sl
+	                JOIN tb_employee e2 ON sl.sanctner = e2.empl_code
+	                WHERE sl.doc_no = d.doc_no
+	                  AND sl.sanctn_sttus != '02'
+	                ORDER BY sl.sanctn_ordr
+	                FETCH FIRST 1 ROWS ONLY
+	            ),
+	            (
+	                SELECT e3.empl_nm
+	                FROM tb_sanction_line sl2
+	                JOIN tb_employee e3 ON sl2.sanctner = e3.empl_code
+	                WHERE sl2.doc_no = d.doc_no
+	                ORDER BY sl2.sanctn_ordr DESC
+	                FETCH FIRST 1 ROWS ONLY
+	            )
+	        ) AS displayApproverName
+	    FROM tb_electronic_filing_document d
+	    JOIN tb_employee e ON d.drafter = e.empl_code
+	    WHERE 1=1
+	      <if test="sj != null and sj != ''">
+	        AND d.sj LIKE '%' || #{sj} || '%'
+	      </if>
+	      AND 
+	      (
+	          d.drafter = #{myEmplCode}
+	          OR
+	          (
+	              d.sttus != '01'
+	              AND
+	              (
+	                  EXISTS (
+	                      SELECT 1
+	                      FROM tb_sanction_line sl
+	                      WHERE sl.doc_no = d.doc_no
+	                        AND sl.sanctner = #{myEmplCode}
+	                  )
+	                  OR
+	                  EXISTS (
+	                      SELECT 1
+	                      FROM tb_corbon_copy cc
+	                      WHERE cc.doc_no = d.doc_no
+	                        AND cc.empl_code = #{myEmplCode}
+	                  )
+	              )
+	          )
+	      )
+	    ORDER BY d.doc_no DESC
+	    OFFSET #{offset} ROWS FETCH NEXT #{pageSize} ROWS ONLY
+	</select>
+	
+	<!-- 4-2. 총 건수 조회 (제목 검색 적용) -->
+  	<select id="getTotalDocumentCount" parameterType="map" resultType="int">
+	    SELECT COUNT(DISTINCT d.doc_no)
+	    FROM tb_electronic_filing_document d
+	    WHERE 1=1
+	      <if test="sj != null and sj != ''">
+	        AND d.sj LIKE '%' || #{sj} || '%'
+	      </if>
+	      AND (
+	          d.drafter = #{myEmplCode}
+	          OR
+	          (
+	              d.sttus != '01'
+	              AND
+	              (
+	                  EXISTS (
+	                      SELECT 1
+	                      FROM tb_sanction_line sl
+	                      WHERE sl.doc_no = d.doc_no
+	                        AND sl.sanctner = #{myEmplCode}
+	                  )
+	                  OR
+	                  EXISTS (
+	                      SELECT 1
+	                      FROM tb_corbon_copy cc
+	                      WHERE cc.doc_no = d.doc_no
+	                        AND cc.empl_code = #{myEmplCode}
+	                  )
+	              )
+	          )
+	      )
+	</select>
+    
+    <select id="getAllDocumentForms" resultType="kr.or.batirplan.electronicdocument.vo.FormVO">
+		SELECT form_no, form_nm
+		  FROM tb_document_form
+		 ORDER BY form_no ASC
+    </select>
+    
+    <select id="getDocumentWriteForm" parameterType="int" resultType="kr.or.batirplan.electronicdocument.vo.FormVO">
+    	SELECT form_no, form_nm, form_cn
+    	  FROM tb_document_form
+    	 WHERE form_no = #{formNo}
+    </select>
+    
+    <insert id="createDocument" parameterType="kr.or.batirplan.electronicdocument.vo.DocumentVO">
+    	INSERT INTO tb_electronic_filing_document (
+    		doc_no, form_no, drft_de, tmlmt_de, sj, drafter, sttus, emrgncy_doc_at, last_sanctn_at, bdt_cn
+    	) VALUES (
+    		seq_electronic.nextval, #{formNo}, #{drftDe}, TO_CHAR(TO_DATE(#{tmlmtDe}, 'YYYY-MM-DD'), 'YYYYMMDD'),
+    		#{sj}, #{drafter}, #{sttus}, #{emrgncyDocAt}, 'N', #{bdtCn}
+    	)
+    </insert>
+    
+    <select id="getLastInsertedDocNo" resultType="int">
+    	SELECT seq_electronic.currval from dual
+    </select>
+    
+    <select id="getAllEmployees" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+    	SELECT 
+		    dept_code, clsf_code, empl_nm, empl_code
+	  	  FROM
+		    tb_employee
+	  	ORDER BY 
+		    dept_code asc, clsf_code asc, empl_nm asc
+    </select>
+    
+    <insert id="insertSanctionLine" parameterType="map">
+    	INSERT INTO tb_sanction_line (
+    		sanctn_line_no,
+    		doc_no,
+    		sanctner,
+    		real_sanctner,
+    		sanctn_ordr,
+    		sanctn_sttus,
+    		sanctn_dt,
+    		return_resn
+    	) VALUES (
+    		seq_sanction.nextval,
+    		#{docNo},
+    		#{approver},
+    		#{approver},
+    		#{order},
+    		'01',
+    		NULL,
+    		NULL
+    	)
+    </insert>
+    
+    <insert id="insertCorbonCopy" parameterType="map">
+    	INSERT INTO tb_corbon_copy (
+    		doc_no,
+    		empl_code
+    	) VALUES (
+    		#{docNo},
+    		#{emplCode}
+    	)
+    </insert>
+    
+    <select id="getDocumentDetail" parameterType="int" resultType="kr.or.batirplan.electronicdocument.vo.DocumentVO">
+        SELECT 
+	        d.doc_no,
+	        d.form_no,
+	        d.drft_de,
+	        d.tmlmt_de,
+	        d.sj,
+	        d.drafter,
+	        e.empl_nm as drafter_name,
+	        d.sttus,
+	        d.emrgncy_doc_at,
+	        d.last_sanctn_at,
+	        d.bdt_cn
+	      FROM tb_electronic_filing_document d
+	      JOIN tb_employee e ON d.drafter = e.empl_code
+	     WHERE d.doc_no = #{docNo}
+    </select>
+
+    <select id="getSanctionLines" parameterType="int" resultType="kr.or.batirplan.electronicdocument.vo.SanctionLineVO">
+	    SELECT 
+	        sl.sanctn_line_no,
+	        sl.doc_no,
+	        sl.sanctner,
+	        sl.real_sanctner,
+	        sl.sanctn_ordr,
+	        sl.sanctn_sttus,
+	        TO_CHAR(sl.sanctn_dt, 'YYYYMMDD') AS sanctn_dt,
+	        sl.return_resn,
+	        e.empl_nm AS sanctner_name,
+	        e.clsf_code AS clsfCode,
+	        e.approval_stamp AS approvalStamp  
+	      FROM tb_sanction_line sl
+	      JOIN tb_employee e 
+	        ON sl.sanctner = e.empl_code
+	     WHERE sl.doc_no = #{docNo}
+	     ORDER BY sl.sanctn_ordr
+	</select>
+
+    <select id="getCorbonCopies" parameterType="int" resultType="kr.or.batirplan.electronicdocument.vo.CorbonCopyVO">
+        SELECT 
+	        cc.doc_no, 
+	        cc.empl_code,
+	        e.empl_nm as empl_name
+	      FROM tb_corbon_copy cc
+	      JOIN tb_employee e ON cc.empl_code = e.empl_code
+	     WHERE cc.doc_no = #{docNo}
+    </select>
+    
+    <update id="updateDocument" parameterType="kr.or.batirplan.electronicdocument.vo.DocumentVO">
+    	UPDATE tb_electronic_filing_document
+	       SET
+	        form_no = #{formNo},
+	        drft_de = #{drftDe},
+	        tmlmt_de = TO_CHAR(TO_DATE(#{tmlmtDe}, 'YYYY-MM-DD'), 'YYYYMMDD'),
+	        sj = #{sj},
+	        drafter = #{drafter},
+	        sttus = #{sttus},
+	        emrgncy_doc_at = #{emrgncyDocAt},
+	        bdt_cn = #{bdtCn}
+	    WHERE doc_no = #{docNo}
+    </update>
+    
+    <delete id="deleteCorbonCopies" parameterType="int">
+    	DELETE FROM tb_corbon_copy
+	  	 WHERE doc_no = #{docNo}
+	</delete>
+	
+	<delete id="deleteSanctionLines" parameterType="int">
+		DELETE FROM tb_sanction_line
+	  	 WHERE doc_no = #{docNo}
+	</delete>
+    
+    <update id="updateStampImage">
+	    UPDATE tb_employee
+	       SET approval_stamp = #{approvalStamp}
+	     WHERE empl_code = #{emplCode}
+	</update>
+    
+    <select id="selectStampUrl">
+    	SELECT approval_stamp
+    	  FROM tb_employee
+    	 WHERE empl_code = #{emplCode}
+    </select>
+    
+    <select id="selectSanctionLineByNo" parameterType="int" resultType="kr.or.batirplan.electronicdocument.vo.SanctionLineVO">
+        SELECT 
+            sl.sanctn_line_no,
+            sl.doc_no,
+            sl.sanctner,
+            sl.real_sanctner,
+            sl.sanctn_ordr,
+            sl.sanctn_sttus,
+            sl.sanctn_dt,
+            sl.return_resn,
+            e.empl_nm AS sanctner_name,
+            e.clsf_code AS clsfCode,
+            e.approval_stamp AS approvalStamp
+          FROM tb_sanction_line sl
+          JOIN tb_employee e ON sl.sanctner = e.empl_code
+         WHERE sl.sanctn_line_no = #{sanctnLineNo}
+    </select>
+
+    <update id="updateSanctionApprove" parameterType="int">
+        UPDATE tb_sanction_line
+           SET sanctn_sttus = '02',
+               sanctn_dt = SYSDATE
+         WHERE sanctn_line_no = #{sanctnLineNo}
+    </update>
+
+    <select id="countNotApprovedLines" parameterType="int" resultType="int">
+        SELECT COUNT(*)
+          FROM tb_sanction_line
+         WHERE doc_no = #{docNo}
+           AND sanctn_sttus != '02'
+    </select>
+
+    <update id="updateDocumentStatus" parameterType="map">
+        UPDATE tb_electronic_filing_document
+           SET sttus = #{status}
+         WHERE doc_no = #{docNo}
+    </update>
+    
+    <update id="rejectSanctionLine">
+	    UPDATE tb_sanction_line
+	       SET sanctn_sttus = '03',
+	       	   sanctn_dt = TO_CHAR(SYSDATE, 'YYYYMMDD'),
+	       	   return_resn = #{returnResn}
+	     WHERE sanctn_line_no = #{sanctnLineNo}
+	</update>
+	
+	<update id="updateSanctionToFinal" parameterType="int">
+	  UPDATE tb_sanction_line
+	     SET sanctn_sttus = '04',
+	         sanctn_dt = SYSDATE
+	   WHERE sanctn_line_no = #{sanctnLineNo}
+	</update>
+    
+</mapper>

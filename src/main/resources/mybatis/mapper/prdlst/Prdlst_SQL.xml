@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.resrce.product.mapper.PrdlstMapper">
+	
+	
+	<sql id="searchCategorySql">
+	    <!-- 대분류(레벨1) 선택 시 -->
+	    <if test="searchVO.level1Select != null and searchVO.level1Select != ''">
+	        AND c1.ctgry_no = #{searchVO.level1Select}
+	    </if>
+	    <!-- 중분류(레벨2) 선택 시 -->
+	    <if test="searchVO.level2Select != null and searchVO.level2Select != ''">
+	        AND c2.ctgry_no = #{searchVO.level2Select}
+	    </if>
+	    <!-- 소분류(레벨3) 선택 시 -->
+	    <if test="searchVO.ctgryNo != null and searchVO.ctgryNo != ''">
+	        AND c3.ctgry_no = #{searchVO.ctgryNo}
+	    </if>
+	</sql>
+	
+	<!-- 협력업체를 뷰단에서 어떻게 값을 넘겨받을 것인가??  -->
+	<sql id="prdlstSearchSql">
+		<if test="searchVO.prdlstNm != null and searchVO.prdlstNm != ''">
+            AND prdlst_nm LIKE '%' || #{searchVO.prdlstNm} || '%'
+        </if>
+		<if test="searchVO.prdlstStndrd != null and searchVO.prdlstStndrd != ''">
+            AND prdlst_stndrd = #{searchVO.prdlstStndrd}
+        </if>
+		<if test="searchVO.prdlstUnit != null and searchVO.prdlstUnit != ''">
+            AND prdlst_unit = #{searchVO.prdlstUnit}
+        </if>
+        <if test="searchVO.prdlstPriceStart != null and searchVO.prdlstPriceStart != ''">
+            <![CDATA[
+              AND prdlst_price >= #{searchVO.prdlstPriceStart}
+            ]]>
+        </if>
+        <if test="searchVO.prdlstPriceEnd != null and searchVO.prdlstPriceEnd != ''">
+            <![CDATA[
+              AND prdlst_price <= #{searchVO.prdlstPriceEnd}
+            ]]>
+        </if>
+        <if test="searchVO.ccpyNm != null and searchVO.ccpyNm != ''">
+	        <!-- 예) subquery 로 협력업체명 검색 -->
+	        AND p.ccpy_code IN (
+	            SELECT ccpy_code 
+	              FROM tb_cooperation_company
+	             WHERE ccpy_nm LIKE '%' || #{searchVO.ccpyNm} || '%'
+	        )
+   		</if>
+	</sql>
+	
+	<!-- 조건에 따른 행 조회 -->
+<!-- Count 조회 (페이징용 전체 건수) -->
+<select id="getPrdlstCount" parameterType="kr.or.batirplan.resrce.product.vo.PrdlstSearchVO">
+    SELECT COUNT(*) 
+      FROM tb_product_list p
+           JOIN tb_prdlst_ctgry c3
+             ON p.ctgry_no = c3.ctgry_no
+           JOIN tb_prdlst_ctgry c2
+             ON c3.parent_ctgry = c2.ctgry_no
+           JOIN tb_prdlst_ctgry c1
+             ON c2.parent_ctgry = c1.ctgry_no
+           LEFT JOIN tb_cooperation_company c
+             ON p.ccpy_code = c.ccpy_code
+     WHERE 1=1
+       <!-- 대/중/소 분류 조건 -->
+       <include refid="searchCategorySql"/>
+       <!-- 품목명, 규격, 단가범위, 협력업체명 등 -->
+       <include refid="prdlstSearchSql"/>
+</select>
+
+	
+<!-- 2) 리스트 조회 (페이징 + 검색조건) -->
+<select id="getPrdlstList" parameterType="map" resultType="kr.or.batirplan.resrce.product.vo.PrdlstVO">
+    SELECT *
+      FROM (
+            SELECT ROWNUM AS rn, A.*
+              FROM (
+                    SELECT 
+                          p.prdlst_no          
+                        , p.ccpy_code          
+                        , p.ctgry_no           
+                        , p.prdlst_nm          
+                        , p.prdlst_stndrd      
+                        , p.prdlst_unit        
+                        , p.prdlst_price       
+                        , p.now_invntry_qy     
+                        , p.safe_invntry_qy    
+                        , c.ccpy_nm         AS ccpyNm
+                    FROM tb_product_list p
+                         JOIN tb_prdlst_ctgry c3 
+                           ON p.ctgry_no = c3.ctgry_no
+                         JOIN tb_prdlst_ctgry c2 
+                           ON c3.parent_ctgry = c2.ctgry_no
+                         JOIN tb_prdlst_ctgry c1 
+                           ON c2.parent_ctgry = c1.ctgry_no
+                         LEFT JOIN tb_cooperation_company c 
+                           ON p.ccpy_code = c.ccpy_code
+                    WHERE 1=1
+                      <include refid="searchCategorySql"/>  <!-- 대/중/소 분류 검색조건 -->
+                      <include refid="prdlstSearchSql"/>       <!-- 품목명/규격/단가 등 기타 검색조건 -->
+                    ORDER BY p.prdlst_no DESC
+                   ) A
+           )
+     WHERE rn BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+</select>
+
+
+	
+	
+	<select id="getUnitList" resultType="String">
+		/* 공통코드 테이블을 이용해 품목 단위 리스트 가져오기 */
+		SELECT
+			code_nm					/* 코드 이름 */
+		FROM
+			tb_commonness_code		/* 공통 코드 테이블 */
+ 		WHERE
+			group_code = 'UNIT'
+		ORDER BY
+			outpt_ordr				/* 출력 순서를 기준으로 조회 */
+	</select>
+	
+    <select id="getLevelOneCtgryList" resultType="kr.or.batirplan.resrce.product.vo.PrdlstCtgryVO">
+        SELECT
+            ctgry_no,               /* 카테고리 번호 */
+            ctgry_nm,               /* 카테고리 이름 */
+            parent_ctgry,           /* 상위 카테고리 */
+            ctgry_level             /* 카테고리 수준 */
+        FROM
+            tb_prdlst_ctgry         /* 품목 카테고리 테이블 */
+        WHERE
+        	ctgry_level  = 1		/* 레벨이 1인 카테고리만 */
+        ORDER BY
+            ctgry_no
+    </select>
+    
+    <select id="getLevelTwoCtgryList" parameterType="int" resultType="kr.or.batirplan.resrce.product.vo.PrdlstCtgryVO">
+        SELECT
+            ctgry_no,               /* 카테고리 번호 */
+            ctgry_nm,               /* 카테고리 이름 */
+            parent_ctgry,           /* 상위 카테고리 */
+            ctgry_level             /* 카테고리 수준 */
+        FROM
+            tb_prdlst_ctgry         /* 품목 카테고리 테이블 */
+        WHERE
+        	ctgry_level  = 2		/* 레벨이 2인 카테고리만 */
+        	and parent_ctgry = #{levelOneCtgryNo}	/* 넘겨받은 카테고리 번호를 부모로 가지고 있는 카테고리만 */ 
+        ORDER BY
+            ctgry_no
+    </select>
+    
+    <select id="getLevelThreeCtgryList" parameterType="int" resultType="kr.or.batirplan.resrce.product.vo.PrdlstCtgryVO">
+        SELECT
+            ctgry_no,               /* 카테고리 번호 */
+            ctgry_nm,               /* 카테고리 이름 */
+            parent_ctgry,           /* 상위 카테고리 */
+            ctgry_level             /* 카테고리 수준 */
+        FROM
+            tb_prdlst_ctgry         /* 품목 카테고리 테이블 */
+        WHERE
+        	ctgry_level  = 3		/* 레벨이 3인 카테고리만 */
+        	and parent_ctgry = #{levelTwoCtgryNo}	/* 넘겨받은 카테고리 번호를 부모로 가지고 있는 카테고리만 */ 
+        ORDER BY
+            ctgry_no
+    </select>
+	
+    <!-- 자재 공급 업체 전체 건수 조회 (검색 조건 적용) -->
+    <select id="getCcpyCount"
+            parameterType="kr.or.batirplan.common.vo.PaginationInfoVO"
+            resultType="int">
+        SELECT COUNT(*) AS totalRecord
+        FROM TB_COOPERATION_COMPANY
+        WHERE 
+        	1=1
+        	and ccpy_cl = '02'
+        <include refid="searchCcpySQL"/>
+    </select>
+
+    <!-- 2) 리스트 조회 (페이징 + 검색 조건 적용, ROWNUM 방식) -->
+    <select id="getCcpyList" parameterType="kr.or.batirplan.common.vo.PaginationInfoVO" resultType="kr.or.batirplan.cooperationcom.vo.CooperationcomVO">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS rnum, A.*
+                  FROM (
+                        SELECT 
+                            CCPY_CODE,
+                            CHARGER,
+                            CCPY_NM,
+                            BIZRNO,
+                            CCPY_TELNO,
+                            CCPY_EMAIL,
+                            CCPY_ADRES,
+                            CCPY_DETAIL_ADRES,
+                            CCPY_CL
+                         FROM TB_COOPERATION_COMPANY
+                         WHERE 1=1
+                         	and ccpy_cl = '02'
+                           <include refid="searchCcpySQL"/>
+                         ORDER BY CCPY_CODE DESC
+                       ) A
+               )
+         WHERE rnum BETWEEN #{startRow} AND #{endRow}
+    </select>
+	
+	
+	<!-- 자재공급업체 검색 쿼리 -->
+    <sql id="searchCcpySQL">
+        <if test="searchWord != null and searchWord != ''">
+            <choose>
+                <when test="searchType == 'all'">
+                    AND (CCPY_CODE LIKE '%' || #{searchWord} || '%'
+                     OR CCPY_NM   LIKE '%' || #{searchWord} || '%')
+                </when>
+                <when test="searchType == 'ccpyNm'">
+                    AND CCPY_NM LIKE '%' || #{searchWord} || '%'
+                </when>
+                <when test="searchType == 'ccpyCode'">
+                    AND CCPY_CODE LIKE '%' || #{searchWord} || '%'
+                </when>
+                <otherwise>
+                    AND (CCPY_CODE LIKE '%' || #{searchWord} || '%'
+                     OR CCPY_NM   LIKE '%' || #{searchWord} || '%')
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+	
+	
+	<insert id="prdlstRegister" parameterType="kr.or.batirplan.resrce.product.vo.PrdlstVO">
+		<selectKey keyProperty="prdlstNo" resultType="int" order="BEFORE">
+			select seq_product.nextval from dual
+		</selectKey>
+		INSERT INTO tb_product_list
+			(
+				  PRDLST_NO               /* */
+				, CCPY_CODE               /* */
+				, CTGRY_NO                /* */
+				, PRDLST_NM               /* */
+				, PRDLST_STNDRD           /* */
+				, PRDLST_UNIT             /* */
+				, PRDLST_PRICE            /* */
+			)
+		VALUES
+			(
+				  #{prdlstNo     }          
+				, #{ccpyCode     }          
+				, #{ctgryNo      }          
+				, #{prdlstNm     }          
+				, #{prdlstStndrd }          
+				, #{prdlstUnit   }          
+				, #{prdlstPrice  }          				
+			)
+	</insert>
+	
+	
+	<update id="setPrdlstImageCours" parameterType="kr.or.batirplan.resrce.product.vo.PrdlstVO">
+		UPDATE 
+			tb_product_list
+		SET
+			PRDLST_IMAGE_COURS  = #{prdlstImageCours}
+		WHERE
+			prdlst_No = #{prdlstNo}
+	</update>
+	
+	<select id="getPrdlstByPrdlstNo" parameterType="int" resultType="kr.or.batirplan.resrce.product.vo.PrdlstVO">
+	    SELECT
+	         p.prdlst_no           AS prdlstNo          /* 품목 번호 (PK) */
+	       , p.ccpy_code           AS ccpyCode          /* 협력업체 코드 */
+	       , (select ccpy_nm from tb_cooperation_company tc where p.ccpy_code = tc.ccpy_code)           AS ccpyNm          /* 협력업체 코드 */
+	       , p.prdlst_nm           AS prdlstNm          /* 품목 이름 */
+	       , p.prdlst_stndrd       AS prdlstStndrd      /* 품목 규격 */
+	       , p.prdlst_unit         AS prdlstUnit        /* 품목 단위 */
+	       , p.prdlst_price        AS prdlstPrice       /* 품목 단가 */
+	       , p.now_invntry_qy      AS nowInvntryQy      /* 현재 재고 수량 */
+	       , p.safe_invntry_qy     AS safeInvntryQy     /* 안전 재고 수량 */
+	       , p.prdlst_image_cours  AS prdlstImageCours  /* 이미지 경로 */
+	
+	       , p.ctgry_no            AS ctgryNo
+	       , c3.ctgry_nm 		   AS ctgryNm 
+	       , c2.ctgry_no           AS levelTwoCtgry
+	       , c2.ctgry_nm           AS levelTwoCtgryNm
+	       , c1.ctgry_no           AS levelOneCtgry
+	       , c1.ctgry_nm           AS levelOneCtgryNm
+	    FROM tb_product_list p
+	
+	         JOIN tb_prdlst_ctgry c3 
+	           ON p.ctgry_no = c3.ctgry_no
+	
+	         JOIN tb_prdlst_ctgry c2 
+	           ON c3.parent_ctgry = c2.ctgry_no
+	
+	         JOIN tb_prdlst_ctgry c1 
+	           ON c2.parent_ctgry = c1.ctgry_no
+	
+	    WHERE 
+	         p.prdlst_no = #{prdlstNo}
+	</select>
+	
+	<update id="prdlstModify" parameterType="kr.or.batirplan.resrce.product.vo.PrdlstVO">
+		UPDATE
+			tb_product_list
+		<set>
+			<if test="prdlstNm != null">prdlst_nm = #{prdlstNm},</if> 
+			<if test="ccpyCode != null">ccpy_code = #{ccpyCode},</if> 
+			<if test="prdlstStndrd != null">prdlst_stndrd = #{prdlstStndrd},</if> 
+			<if test="prdlstUnit != null">prdlst_unit = #{prdlstUnit},</if> 
+			<if test="prdlstNm != null">prdlst_price = #{prdlstPrice},</if> 
+		</set>
+		WHERE
+			prdlst_no = #{prdlstNo}
+	</update>
+	
+</mapper>

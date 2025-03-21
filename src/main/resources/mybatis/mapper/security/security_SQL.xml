@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.security.mapper.SecurityMapper">
+
+	<resultMap type="kr.or.batirplan.security.vo.MemberVO" id="memberMap">
+		<id property="mberId" column="mber_id"/>
+		<result property="mberId" column="mber_id"/>
+		<result property="mberPassword" column="mber_password"/>
+		<result property="seCode" column="se_code"/>
+		<association property="empVO" resultMap="empMap"/>
+		<association property="ccpyVO" resultMap="ccpyMap"/>
+		<collection property="auths" resultMap="authMap"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.batirplan.employee.vo.EmployeeVO" id="empMap">
+		<id property="emplCode" column="emplcode"/>
+		<result property="emplCode" column="empl_code"/>
+	    <result property="emplNm" column="empl_nm"/>
+		<result property="emplPassword" column="empl_password"/>
+	    <result property="deptCode" column="dept_code"/>
+	    <result property="clsfCode" column="clsf_code"/>
+	    <result property="brthdy" column="brthdy"/>
+	    <result property="email" column="email"/>
+	    <result property="mbtlnum" column="mbtlnum"/>
+	    <result property="sexdstn" column="sexdstn"/>
+	    <result property="zip" column="zip"/>
+	    <result property="adres" column="adres"/>
+	    <result property="detailadres" column="detailadres"/>
+	    <result property="bankCode" column="bank_code"/>
+	    <result property="acnutno" column="acnutno"/>
+	    <result property="acntSttusCode" column="acnt_sttus_code"/>
+	    <result property="proflImageCours" column="profl_image_cours"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.batirplan.cooperationcom.vo.CooperationcomVO" id="ccpyMap">
+		<id property="ccpyCode" column="CCPY_CODE"/>
+	    <result property="charger" column="CHARGER"/>
+	    <result property="ccpyPassword" column="CCPY_PASSWORD"/>
+	    <result property="charger" column="CHARGER"/>
+	    <result property="ccpyNm" column="CCPY_NM"/>
+	    <result property="bizrno" column="BIZRNO"/>
+	    <result property="ccpyTelno" column="CCPY_TELNO"/>
+	    <result property="ccpyEmail" column="CCPY_EMAIL"/>
+	    <result property="ccpyAdres" column="CCPY_ADRES"/>
+	    <result property="ccpyDetailAdres" column="CCPY_DETAIL_ADRES"/>
+	    <result property="ccpyCl" column="CCPY_CL"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.batirplan.security.vo.MemberAuthVO" id="authMap">
+		<result property="mberId" column="mber_id"/>
+		<result property="mberAuthor" column="mber_author"/>
+	</resultMap>
+
+	<select id="readByUserInfo" parameterType="hashMap" resultMap="memberMap">
+		select
+		    tm.MBER_ID, MBER_PASSWORD, SE_CODE, ENABLED, mber_author
+		    <if test="type != null and type == 'ccpy'">
+			    ,CCPY_CODE, CHARGER, CCPY_NM, BIZRNO, CCPY_TELNO, CCPY_EMAIL, CCPY_ADRES, CCPY_DETAIL_ADRES, CCPY_CL
+		    </if>
+		    <if test="type != null and type == 'empl'">
+			    ,EMPL_CODE, EMPL_NM, DEPT_CODE, CLSF_CODE, BRTHDY, EMAIL, MBTLNUM, SEXDSTN, ZIP, ADRES, DETAILADRES, BANK_CODE, ACNUTNO, ACNT_STTUS_CODE, PROFL_IMAGE_COURS
+		    </if>
+		from tb_member tm
+			left outer join tb_member_authority tma on(tm.mber_id = tma.mber_id)
+		    <if test="type != null and type == 'ccpy'">
+	            left outer join tb_cooperation_company tcc on(tm.mber_id = tcc.mber_id)  
+		    </if>
+		    <if test="type != null and type == 'empl'">
+				left outer join tb_employee te on(tm.mber_id = te.mber_id)  
+		    </if>
+		where tm.mber_id = #{username}
+	</select>
+
+</mapper>

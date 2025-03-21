@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.equipment.mapper.EquipmentMapper">
+
+ <select id="getEquipmentList" parameterType="string" resultType="kr.or.batirplan.equipment.vo.EquipmentVO">
+    SELECT EQPMN_NO, EQPMN_NM, EQPMN_TY, EQPMN_SN, MAKR_NM, EQPMN_PC, EQPMN_PURCHS_DE, EQPMN_STTUS, EQPMN_LC 
+    FROM TB_EQUIPMENT
+    <where>
+        <if test="keyword != null and keyword != ''">
+            (EQPMN_NM LIKE '%' || #{keyword} || '%'
+            OR EQPMN_TY LIKE '%' || #{keyword} || '%'
+            OR EQPMN_SN LIKE '%' || #{keyword} || '%'
+            OR MAKR_NM LIKE '%' || #{keyword} || '%')
+        </if>
+    </where>
+    ORDER BY EQPMN_NO DESC
+</select>
+
+    <select id="getEquipmentByNo" parameterType="int" resultType="kr.or.batirplan.equipment.vo.EquipmentVO">
+        SELECT * FROM TB_EQUIPMENT WHERE EQPMN_NO = #{eqpmnNo}
+    </select>
+
+    <insert id="insertEquipment">
+        INSERT INTO TB_EQUIPMENT (EQPMN_NO, EQPMN_NM, EQPMN_TY, EQPMN_SN, MAKR_NM, EQPMN_PC, EQPMN_PURCHS_DE, EQPMN_STTUS, EQPMN_LC)
+        VALUES (SEQ_EQUIPMENT.NEXTVAL, #{eqpmnNm}, #{eqpmnTy}, #{eqpmnSn}, #{makrNm}, #{eqpmnPc}, #{eqpmnPurchsDe}, '01', #{eqpmnLc})
+    </insert>
+
+    <update id="updateEquipmentStatus">
+        UPDATE TB_EQUIPMENT SET EQPMN_STTUS = #{status} WHERE EQPMN_NO = #{eqpmnNo}
+    </update>
+
+    <select id="getIncomingEquipment" resultType="kr.or.batirplan.equipment.vo.EquipmentVO">
+	    SELECT * FROM TB_EQUIPMENT
+	    WHERE EQPMN_STTUS = '03'
+	    AND (EQPMN_NM LIKE '%' || #{keyword} || '%' OR MAKR_NM LIKE '%' || #{keyword} || '%')
+	</select>
+
+    <update id="receiveEquipment">
+        UPDATE TB_EQUIPMENT SET EQPMN_STTUS = '01' WHERE EQPMN_NO = #{eqpmnNo}
+    </update>
+
+    <select id="countBySerialNumber" parameterType="string" resultType="int">
+        SELECT COUNT(*) FROM TB_EQUIPMENT WHERE EQPMN_SN = #{eqpmnSn}
+    </select>
+    
+    <!-- 추가: 장비명 검색 SQL -->
+    <select id="searchEquipment" parameterType="string" resultType="kr.or.batirplan.equipment.vo.EquipmentVO">
+        SELECT * FROM TB_EQUIPMENT 
+        WHERE EQPMN_NM LIKE '%' || #{keyword} || '%'
+    </select>
+    
+</mapper>

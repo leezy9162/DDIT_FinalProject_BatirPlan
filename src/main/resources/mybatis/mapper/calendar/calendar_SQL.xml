@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.calendar.mapper.ICalendarMapper">
+
+    <!-- 📌 일정 추가 -->
+    <insert id="insertEvent" parameterType="kr.or.batirplan.calendar.vo.CalendarVO">
+        INSERT INTO TB_CALENDAR_EVENT (
+            EVENT_ID, EVENT_TITLE, EVENT_WRITER, EVENT_DESCRIPTION, START_TIME, END_TIME,
+            CATEGORY, EVENT_STATUS, CREATED_TIME, TEXT_COLOR, BACKGROUND_COLOR, BORDER_COLOR
+        )
+        VALUES (
+            SEQ_CALENDAR.NEXTVAL, #{eventTitle}, #{eventWriter}, #{eventDescription},
+            TO_DATE(#{startTime}, 'YYYY-MM-DD'), TO_DATE(#{endTime}, 'YYYY-MM-DD'),
+            #{category}, #{eventStatus}, SYSDATE, #{textColor}, #{backgroundColor}, #{borderColor}
+        )
+    </insert>
+
+     <!-- 📌 로그인한 사용자가 추가한 일정만 조회 -->
+    <select id="getMyEvents" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+        SELECT EVENT_ID, EVENT_TITLE, EVENT_WRITER, EVENT_DESCRIPTION, 
+               TO_CHAR(START_TIME, 'YYYY-MM-DD') AS startTime,  
+               TO_CHAR(END_TIME, 'YYYY-MM-DD') AS endTime,      
+               CATEGORY, EVENT_STATUS, TEXT_COLOR, BACKGROUND_COLOR, BORDER_COLOR
+        FROM TB_CALENDAR_EVENT
+        WHERE EVENT_WRITER = #{userId}  <!-- 🔹 로그인한 사용자가 작성한 일정만 가져옴 -->
+    </select>
+
+    <!-- 📌 내가 속한 프로젝트 일정 가져오기 -->
+    <select id="getMyProjects" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+	    SELECT PRJCT_NO AS eventId, 
+	           PRJCT_NM AS eventTitle, 
+	           CHARGER AS eventWriter,
+	           '프로젝트' AS category, 
+	           PRJCT_CTGRY AS eventDescription,
+	           TO_CHAR(TO_DATE(PRJCT_BGNDE, 'YYYYMMDD'), 'YYYY-MM-DD') AS startTime,
+	           TO_CHAR(TO_DATE(PRJCT_ENDDE, 'YYYYMMDD'), 'YYYY-MM-DD') AS endTime,
+	           '01' AS eventStatus, 
+	           TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS createdTime
+	    FROM TB_PROJECT
+	    WHERE CHARGER = #{userId} 
+	       OR SPT_MNGR = #{userId}  
+	       OR PRJCT_NO IN (SELECT PRJCT_NO FROM TB_PROCESS WHERE CCPY_CODE = #{userId})
+	</select>
+
+    
+
+    <!-- 📌 내가 속한 결재 일정 가져오기 -->   
+	<select id="getMyApprovals" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+	    SELECT DOC_NO AS eventId, 
+	           SJ AS eventTitle, 
+	           DRAFTER AS eventWriter,
+	           '결재' AS category, 
+	           BDT_CN AS eventDescription,
+	           TO_CHAR(TO_DATE(DRFT_DE, 'YYYYMMDD'), 'YYYY-MM-DD') AS startTime,
+	           TO_CHAR(TO_DATE(TMLMT_DE, 'YYYYMMDD'), 'YYYY-MM-DD') AS endTime,
+	           STTUS AS eventStatus,  
+	           TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS createdTime
+	    FROM TB_ELECTRONIC_FILING_DOCUMENT
+	    WHERE DRAFTER = #{userId}
+	</select>
+
+    
+     <!-- 📌 내가 속한 공정 가져오기 (공정 포함) -->
+    <select id="getMyProcesses" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+        SELECT PROCS_NO AS eventId, 
+               PROCS_NM AS eventTitle, 
+               CCPY_CODE AS eventWriter,  
+               '공정' AS category, 
+               PROCS_CN AS eventDescription,
+               TO_CHAR(PROCS_BGNDE, 'YYYY-MM-DD') AS startTime,
+               TO_CHAR(PROCS_ENDDE, 'YYYY-MM-DD') AS endTime,
+               PROGRS_STTUS AS eventStatus, 
+               TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS createdTime
+        FROM TB_PROCESS
+        WHERE PRJCT_NO IN (SELECT PRJCT_NO FROM TB_PROJECT WHERE CHARGER = #{userId} OR SPT_MNGR = #{userId})
+           OR CCPY_CODE = #{userId}
+    </select>
+    
+    
+      <!-- 📌 로그인한 사용자가 직접 신청한 장비 일정 조회 -->
+    <select id="getMyEquipmentEvents" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+        SELECT REQUEST_NO AS eventId,
+               '장비 배치' AS eventTitle,
+               EMPL_CODE AS eventWriter,
+               '장비' AS category,
+               ARRANGEMENT_REASON AS eventDescription,
+               TO_CHAR(REQUEST_DATE, 'YYYY-MM-DD') AS startTime,
+               TO_CHAR(RENTAL_END_DATE, 'YYYY-MM-DD') AS endTime,
+               CASE APPROVAL_STATUS
+                   WHEN 'Y' THEN '승인됨'
+                   WHEN 'D' THEN '대기중'
+                   ELSE '미승인'
+               END AS eventStatus,
+               '#ffffff' AS textColor,
+               CASE APPROVAL_STATUS
+                   WHEN 'Y' THEN '#28a745'  
+                   WHEN 'D' THEN '#ffc107'  
+                   ELSE '#dc3545'           
+               END AS backgroundColor,
+               '#000000' AS borderColor
+        FROM TB_EQUIPMENT_ARRANGEMENT_REQUEST
+        WHERE EMPL_CODE = #{userId} 
+    </select>
+    
+
+    <!-- 📌 일정 수정 -->
+    <update id="updateEvent" parameterType="kr.or.batirplan.calendar.vo.CalendarVO">
+        UPDATE TB_CALENDAR_EVENT 
+		SET EVENT_TITLE = NVL(#{eventTitle}, EVENT_TITLE), 
+		    EVENT_DESCRIPTION = NVL(#{eventDescription}, EVENT_DESCRIPTION), 
+		    START_TIME = TO_DATE(#{startTime}, 'YYYY-MM-DD'), 
+		    END_TIME = TO_DATE(#{endTime}, 'YYYY-MM-DD'), 
+		    CATEGORY = NVL(#{category}, CATEGORY), 
+		    EVENT_STATUS = NVL(#{eventStatus}, EVENT_STATUS), 
+		    TEXT_COLOR = NVL(#{textColor}, TEXT_COLOR), 
+		    BACKGROUND_COLOR = NVL(#{backgroundColor}, BACKGROUND_COLOR), 
+		    BORDER_COLOR = NVL(#{borderColor}, BORDER_COLOR)
+		WHERE EVENT_ID = #{eventId}
+
+    </update>
+
+    <!-- 📌 일정 삭제 -->
+    <delete id="deleteEvent" parameterType="int">
+        DELETE FROM TB_CALENDAR_EVENT WHERE EVENT_ID = #{eventId}
+    </delete>
+    
+    <select id="getAllProjects" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+	    SELECT PRJCT_NO AS eventId, 
+	           PRJCT_NM AS eventTitle, 
+	           CHARGER AS eventWriter,
+	           '프로젝트' AS category, 
+	           PRJCT_CTGRY AS eventDescription,
+	           TO_CHAR(TO_DATE(PRJCT_BGNDE, 'YYYYMMDD'), 'YYYY-MM-DD') AS startTime,
+	           TO_CHAR(TO_DATE(PRJCT_ENDDE, 'YYYYMMDD'), 'YYYY-MM-DD') AS endTime,
+	           '01' AS eventStatus, 
+	           TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS createdTime
+	    FROM TB_PROJECT
+	</select>
+    
+    
+    <!-- 📌 특정 프로젝트(PRJCT_NO)의 프로젝트 & 공정 일정 가져오기 -->
+	<select id="getProjectRelatedEvents" parameterType="int" resultType="kr.or.batirplan.calendar.vo.CalendarVO">
+	    SELECT PRJCT_NO AS eventId, 
+	           PRJCT_NM AS eventTitle, 
+	           CHARGER AS eventWriter,
+	           '프로젝트' AS category, 
+	           PRJCT_CTGRY AS eventDescription,
+	           TO_CHAR(TO_DATE(PRJCT_BGNDE, 'YYYYMMDD'), 'YYYY-MM-DD') AS startTime,
+	           TO_CHAR(TO_DATE(PRJCT_ENDDE, 'YYYYMMDD'), 'YYYY-MM-DD') AS endTime,
+	           '01' AS eventStatus, 
+	           TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS createdTime
+	    FROM TB_PROJECT
+	    WHERE PRJCT_NO = #{prjctNo}
+	
+	    UNION ALL
+	
+	    SELECT PROCS_NO AS eventId, 
+	           PROCS_NM AS eventTitle, 
+	           CCPY_CODE AS eventWriter,  
+	           '공정' AS category, 
+	           PROCS_CN AS eventDescription,
+	           TO_CHAR(PROCS_BGNDE, 'YYYY-MM-DD') AS startTime,
+	           TO_CHAR(PROCS_ENDDE, 'YYYY-MM-DD') AS endTime,
+	           PROGRS_STTUS AS eventStatus, 
+	           TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS createdTime
+	    FROM TB_PROCESS
+	    WHERE PRJCT_NO = #{prjctNo}
+	</select>
+
+</mapper>

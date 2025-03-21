@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.bid.pricequotation.mapper.IQuotationMapper">
+
+    <!-- 1) 견적서 등록 -->
+    <!--
+         주의: useGeneratedKeys / keyProperty / keyColumn 설정은
+              Oracle DB에서 동작하려면 추가 설정이 필요할 수 있음
+    -->
+    <insert id="insertQuotation" parameterType="kr.or.batirplan.bid.pricequotation.vo.QuotationVO"
+            useGeneratedKeys="true" keyProperty="prqudoNo" keyColumn="PRQUDO_NO">
+        INSERT INTO TB_PRICE_QUOTATION_DOCUMENT (
+            PRQUDO_NO,
+            PBLANC_NO,
+            CMPNY_NM,
+            RPRSNTV_NM,
+            BIZRNO,
+            CMPNY_TELNO,
+            MBTLNUM,
+            PRQUDO_SJ,
+            PRQUDO_CN,
+            PRQUDO_PASSWORD,
+            WRITNG_DT,
+            CONFM_AT
+        ) VALUES (
+            SEQ_QUOTATION.NEXTVAL,
+            #{pblancNo},
+            #{cmpnyNm},
+            #{rprsntvNm},
+            #{bizrno},
+            #{cmpnyTelno},
+            #{mbtlnum},
+            #{prqudoSj},
+            #{prqudoCn},
+            #{prqudoPassword},
+            SYSDATE,
+            'N'
+        )
+    </insert>
+
+    <!-- 2) 견적서 조회 -->
+    <select id="searchQuotation"
+            resultType="kr.or.batirplan.bid.pricequotation.vo.QuotationVO">
+        SELECT
+            PRQUDO_NO,
+            PBLANC_NO,
+            CMPNY_NM,
+            RPRSNTV_NM,
+            BIZRNO,
+            CMPNY_TELNO,
+            MBTLNUM,
+            PRQUDO_SJ,
+            PRQUDO_CN,
+            PRQUDO_PASSWORD,
+            WRITNG_DT,
+            CONFM_AT,
+	        f.FILE_NO,
+	        f.FILE_NM,
+	        f.FILE_COURS
+	    FROM TB_PRICE_QUOTATION_DOCUMENT q
+	    LEFT JOIN TB_ATTACHMENT_FILE f
+	      ON f.TABLE_NO = q.PRQUDO_NO
+        WHERE PBLANC_NO = #{pblancNo}
+          AND CMPNY_NM = #{cmpnyNm}
+          AND PRQUDO_PASSWORD = #{prqudoPassword}
+    </select>
+    
+    <!-- 단건 상세 조회 -->
+	<select id="selectQuotationDetail" parameterType="string" resultMap="quotationDetailMap">
+	    SELECT
+	        q.PRQUDO_NO,
+	        q.PBLANC_NO,
+	        q.CMPNY_NM,
+	        q.RPRSNTV_NM,
+	        q.BIZRNO,
+	        q.CMPNY_TELNO,
+	        q.MBTLNUM,
+	        q.PRQUDO_SJ,
+	        q.PRQUDO_CN,
+	        q.PRQUDO_PASSWORD,
+	        q.WRITNG_DT,
+	        q.CONFM_AT,
+	        f.FILE_NO,
+	        f.FILE_NM,
+	        f.FILE_COURS
+	    FROM TB_PRICE_QUOTATION_DOCUMENT q
+	    LEFT JOIN TB_ATTACHMENT_FILE f
+	      ON f.TABLE_NO = q.PRQUDO_NO
+	     AND f.TABLE_TY = 'QTN'  <!-- "QTN" 또는 "QUOTATION" -->
+	    WHERE q.PRQUDO_NO = #{prqudoNo}
+	</select>
+	
+	<resultMap id="quotationDetailMap" type="kr.or.batirplan.bid.pricequotation.vo.QuotationVO">
+	    <id property="prqudoNo" column="PRQUDO_NO" />
+	    <result property="pblancNo" column="PBLANC_NO"/>
+	    <result property="cmpnyNm" column="CMPNY_NM"/>
+	    <result property="rprsntvNm" column="RPRSNTV_NM"/>
+	    <result property="bizrno" column="BIZRNO"/>
+	    <result property="cmpnyTelno" column="CMPNY_TELNO"/>
+	    <result property="mbtlnum" column="MBTLNUM"/>
+	    <result property="prqudoSj" column="PRQUDO_SJ"/>
+	    <result property="prqudoCn" column="PRQUDO_CN"/>
+	    <result property="prqudoPassword" column="PRQUDO_PASSWORD"/>
+	    <result property="writngDt" column="WRITNG_DT"/>
+	    <result property="confmAt" column="CONFM_AT"/>
+	    <!-- ▼ 첨부파일 -->
+	    <result property="fileNo" column="fileNo"/>
+	    <result property="fileNm" column="fileNm"/>
+	    <result property="fileMg" column="fileMg"/>
+	    <result property="fileMime" column="fileMime"/>
+	    <result property="fileTy" column="fileTy"/>
+	    <result property="fileCours" column="fileCours"/>
+	</resultMap>
+	
+	<delete id="deleteQuotation" parameterType="map">
+        DELETE FROM TB_PRICE_QUOTATION_DOCUMENT
+        WHERE PRQUDO_NO = #{prqudoNo}
+          AND PRQUDO_PASSWORD = #{prqudoPassword}
+    </delete>
+
+	<select id="selectQuotation" parameterType="kr.or.batirplan.bid.pricequotation.vo.QuotationVO" resultType="kr.or.batirplan.bid.pricequotation.vo.QuotationVO">
+		SELECT
+	        q.PRQUDO_NO,
+	        q.PBLANC_NO,
+	        q.CMPNY_NM,
+	        q.RPRSNTV_NM,
+	        q.BIZRNO,
+	        q.CMPNY_TELNO,
+	        q.MBTLNUM,
+	        q.PRQUDO_SJ,
+	        q.PRQUDO_CN,
+	        q.PRQUDO_PASSWORD,
+	        q.WRITNG_DT,
+	        q.CONFM_AT
+	    FROM TB_PRICE_QUOTATION_DOCUMENT q
+	    WHERE q.PBLANC_NO = #{pblancNo}
+	    AND	q.BIZRNO = #{bizrno}
+	</select>
+	
+	<select id="getAnnouncementTitle" parameterType="string" resultType="string">
+	    SELECT PBLANC_SJ 
+	    FROM TB_BID_PUBLIC_ANNOUNCEMENT
+	    WHERE PBLANC_NO = #{pblancNo}
+	</select>
+
+</mapper>

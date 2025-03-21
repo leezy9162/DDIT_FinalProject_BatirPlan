@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.message.mapper.MessageMapper">
+
+    <!-- 보낸 쪽지 VO 매핑 -->
+    <resultMap id="messageResultMap" type="kr.or.batirplan.message.vo.MessageVO">
+        <id property="mssageNo" column="MSSAGE_NO"/>
+        <result property="dsptcher" column="DSPTCHER"/>
+        <result property="cn" column="CN"/>
+        <result property="sndngDt" column="SNDNG_DT"/>
+        <result property="messageSttus" column="MESSAGE_STTUS"/>
+        <result property="recovryPosblAt" column="RECOVRY_POSBL_AT"/>
+        <result property="dsptcherName" column="DSPTCHER_NAME"/>
+        <result property="rcverName" column="RCVER_NAME"/>
+    </resultMap>
+
+    <!-- 받은 쪽지 VO 매핑 -->
+    <resultMap id="messageReceptionResultMap" type="kr.or.batirplan.message.vo.MessageReceptionVO">
+        <id property="recptnNo" column="RECPTN_NO"/>
+        <result property="mssageNo" column="MSSAGE_NO"/>
+        <result property="rcver" column="RCVER"/>
+        <result property="recptnDt" column="RECPTN_DT"/>
+        <result property="messageSttus" column="MESSAGE_STTUS"/>
+        <result property="recovryPosblAt" column="RECOVRY_POSBL_AT"/>
+        <result property="dsptcher" column="DSPTCHER"/>
+        <result property="cn" column="CN"/>
+        <result property="dsptcherName" column="DSPTCHER_NAME"/>
+    </resultMap>
+
+    <!-- 쪽지 INSERT -->
+    <insert id="insertMessage" parameterType="kr.or.batirplan.message.vo.MessageVO">
+        <selectKey keyProperty="mssageNo" resultType="int" order="BEFORE">
+            SELECT SEQ_MESSAGE.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO TB_MESSAGE (
+            MSSAGE_NO,
+            DSPTCHER,
+            CN,
+            SNDNG_DT,
+            MESSAGE_STTUS,
+            RECOVRY_POSBL_AT
+        ) VALUES (
+            #{mssageNo},
+            #{dsptcher},
+            #{cn},
+            SYSDATE,
+            'N',
+            'Y'
+        )
+    </insert>
+
+    <!-- 수신 INSERT -->
+    <insert id="insertMessageReception" parameterType="kr.or.batirplan.message.vo.MessageReceptionVO">
+        INSERT INTO TB_MESSAGE_RECEPTION (
+            RECPTN_NO,
+            MSSAGE_NO,
+            RCVER,
+            RECPTN_DT,
+            MESSAGE_STTUS,
+            RECOVRY_POSBL_AT
+        ) VALUES (
+            SEQ_MESSAGE_RECEPTION.NEXTVAL,
+            #{mssageNo},
+            #{rcver},
+            SYSDATE,
+            'N',
+            'Y'
+        )
+    </insert>
+
+    <!-- 보낸 쪽지 목록 조회 -->
+    <select id="selectSentMessages" resultMap="messageResultMap" parameterType="map">
+        SELECT
+            m.MSSAGE_NO,
+            r.RCVER,
+            e.EMPL_NM AS RCVER_NAME,
+            m.CN,
+            TO_CHAR(m.SNDNG_DT, 'YYYY-MM-DD HH24:MI:SS') AS SNDNG_DT,
+            m.MESSAGE_STTUS
+        FROM TB_MESSAGE m
+        JOIN TB_MESSAGE_RECEPTION r ON m.MSSAGE_NO = r.MSSAGE_NO
+        LEFT JOIN TB_EMPLOYEE e ON r.RCVER = e.EMPL_CODE
+        WHERE
+            m.DSPTCHER = #{dsptcher}
+            AND m.RECOVRY_POSBL_AT != 'D'
+        <if test="'emplCode'.equals(searchFilter)">
+            AND e.EMPL_NM LIKE '%' || #{searchKeyword} || '%'
+        </if>
+        <if test="'content'.equals(searchFilter)">
+            AND m.CN LIKE '%' || #{searchKeyword} || '%'
+        </if>
+        ORDER BY m.SNDNG_DT DESC
+    </select>
+
+    <!-- 받은 쪽지 목록 조회 -->
+    <select id="selectReceivedMessages" resultMap="messageReceptionResultMap" parameterType="map">
+        SELECT
+            tr.RECPTN_NO,
+            tr.MSSAGE_NO,
+            e.EMPL_NM AS DSPTCHER_NAME,
+            tr.RCVER,
+            TO_CHAR(tr.RECPTN_DT, 'YYYY-MM-DD HH24:MI:SS') AS RECPTN_DT,
+            tr.MESSAGE_STTUS,
+            tr.RECOVRY_POSBL_AT,
+            tm.CN
+        FROM TB_MESSAGE_RECEPTION tr
+        JOIN TB_MESSAGE tm ON tr.MSSAGE_NO = tm.MSSAGE_NO
+        LEFT JOIN TB_EMPLOYEE e ON tm.DSPTCHER = e.EMPL_CODE
+        WHERE
+            tr.RCVER = #{rcver}
+            AND tr.RECOVRY_POSBL_AT != 'D'
+        <if test="'emplCode'.equals(searchFilter) and searchKeyword != null and searchKeyword != ''">
+            AND e.EMPL_NM LIKE '%' || #{searchKeyword} || '%'
+        </if>
+        <if test="'content'.equals(searchFilter) and searchKeyword != null and searchKeyword != ''">
+            AND tm.CN LIKE '%' || #{searchKeyword} || '%'
+        </if>
+        ORDER BY tr.RECPTN_DT DESC
+    </select>
+
+    <!-- 쪽지 상세 조회 -->
+    <select id="selectMessageDetail" resultMap="messageResultMap">
+        SELECT
+            tm.MSSAGE_NO,
+            tm.DSPTCHER,
+            e.EMPL_NM AS DSPTCHER_NAME,
+            tm.CN,
+            tm.SNDNG_DT,
+            tm.MESSAGE_STTUS,
+            tm.RECOVRY_POSBL_AT
+        FROM TB_MESSAGE tm
+        JOIN TB_EMPLOYEE e ON tm.DSPTCHER = e.EMPL_CODE
+        WHERE tm.MSSAGE_NO = #{mssageNo}
+    </select>
+
+    <!-- 받은 쪽지 읽음 처리 -->
+    <update id="updateMessageStatus" parameterType="map">
+        UPDATE TB_MESSAGE_RECEPTION
+        SET MESSAGE_STTUS = 'Y'
+        WHERE MSSAGE_NO = #{mssageNo}
+          AND RCVER = #{rcver}
+    </update>
+
+    <!-- 발신자 쪽지 중 읽음 상태인 메시지 번호 조회 쿼리 -->
+    <select id="selectReadMessages" resultType="int">
+        SELECT DISTINCT M.MSSAGE_NO
+        FROM TB_MESSAGE M
+        JOIN TB_MESSAGE_RECEPTION R ON M.MSSAGE_NO = R.MSSAGE_NO
+        WHERE M.DSPTCHER = #{sender} AND R.MESSAGE_STTUS = 'Y'
+    </select>
+
+    <!-- 보낸 쪽지 -> 휴지통 이동 -->
+    <update id="deleteSentMessagesToTrash" parameterType="map">
+        UPDATE TB_MESSAGE
+        SET RECOVRY_POSBL_AT = 'D'
+        WHERE DSPTCHER = #{userId}
+          AND MSSAGE_NO IN
+          <foreach item="mssageNo" collection="mssageNos" open="(" separator="," close=")">
+              #{mssageNo}
+          </foreach>
+    </update>
+
+    <!-- 받은 쪽지 -> 휴지통 이동 -->
+    <update id="deleteReceivedMessagesToTrash" parameterType="map">
+        UPDATE TB_MESSAGE_RECEPTION
+        SET RECOVRY_POSBL_AT = 'D'
+        WHERE RCVER = #{userId}
+          AND RECPTN_NO IN
+          <foreach item="recptnNo" collection="recptnNos" open="(" separator="," close=")">
+              #{recptnNo}
+          </foreach>
+    </update>
+
+    <!-- 휴지통 목록 (보낸+받은 UNION) -->
+    <select id="selectTrashMessages" parameterType="map" resultType="map">
+	    SELECT
+	        M.MSSAGE_NO AS MSSAGE_NO,
+	        E.EMPL_NM AS SENDER,
+	        M.CN AS CONTENT,
+	        TO_CHAR(M.SNDNG_DT, 'YYYY-MM-DD HH24:MI:SS') AS SEND_RECEIVE_DATE,
+	        'S' AS BOX_TYPE,
+	        M.MSSAGE_NO AS UNIQUE_ID
+	    FROM TB_MESSAGE M
+	    LEFT JOIN TB_EMPLOYEE E ON M.DSPTCHER = E.EMPL_CODE
+	    WHERE M.DSPTCHER = #{userId}
+	      AND M.RECOVRY_POSBL_AT = 'D'
+	      <if test="searchFilter == 'emplCode' and searchKeyword != null and searchKeyword != ''">
+	        AND E.EMPL_NM LIKE '%' || #{searchKeyword} || '%'
+	      </if>
+	      <if test="searchFilter == 'content' and searchKeyword != null and searchKeyword != ''">
+	        AND M.CN LIKE '%' || #{searchKeyword} || '%'
+	      </if>
+	    UNION ALL
+	    SELECT
+	        R.MSSAGE_NO AS MSSAGE_NO,
+	        E.EMPL_NM AS SENDER,
+	        T.CN AS CONTENT,
+	        TO_CHAR(R.RECPTN_DT, 'YYYY-MM-DD HH24:MI:SS') AS SEND_RECEIVE_DATE,
+	        'R' AS BOX_TYPE,
+	        R.RECPTN_NO AS UNIQUE_ID
+	    FROM TB_MESSAGE_RECEPTION R
+	    JOIN TB_MESSAGE T ON R.MSSAGE_NO = T.MSSAGE_NO
+	    LEFT JOIN TB_EMPLOYEE E ON T.DSPTCHER = E.EMPL_CODE
+	    WHERE R.RCVER = #{userId}
+	      AND R.RECOVRY_POSBL_AT = 'D'
+	      <if test="searchFilter == 'emplCode' and searchKeyword != null and searchKeyword != ''">
+	        AND E.EMPL_NM LIKE '%' || #{searchKeyword} || '%'
+	      </if>
+	      <if test="searchFilter == 'content' and searchKeyword != null and searchKeyword != ''">
+	        AND T.CN LIKE '%' || #{searchKeyword} || '%'
+	      </if>
+	    ORDER BY SEND_RECEIVE_DATE DESC
+	</select>
+
+
+    <!-- 휴지통 복구 (보낸) -->
+    <update id="restoreSentMessages" parameterType="map">
+        UPDATE TB_MESSAGE
+        SET RECOVRY_POSBL_AT = 'Y'
+        WHERE DSPTCHER = #{userId}
+          AND MSSAGE_NO IN
+          <foreach item="id" collection="ids" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+    </update>
+
+    <!-- 휴지통 복구 (받은) -->
+    <update id="restoreReceivedMessages" parameterType="map">
+        UPDATE TB_MESSAGE_RECEPTION
+        SET RECOVRY_POSBL_AT = 'Y'
+        WHERE RCVER = #{userId}
+          AND RECPTN_NO IN
+          <foreach item="id" collection="ids" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+    </update>
+
+    <!-- 자식(받은 쪽지) 먼저 삭제 -->
+    <delete id="deleteReceptionByMessageNos" parameterType="map">
+        DELETE FROM TB_MESSAGE_RECEPTION
+        WHERE MSSAGE_NO IN
+          <foreach item="id" collection="ids" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+          AND MSSAGE_NO IN (
+              SELECT MSSAGE_NO
+              FROM TB_MESSAGE
+              WHERE DSPTCHER = #{userId}
+          )
+    </delete>
+
+    <!-- 보낸 쪽지 영구삭제 -->
+    <delete id="permanentlyDeleteSentMessages" parameterType="map">
+        DELETE FROM TB_MESSAGE
+        WHERE DSPTCHER = #{userId}
+          AND MSSAGE_NO IN
+          <foreach item="id" collection="ids" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+    </delete>
+
+    <!-- 받은 쪽지 영구삭제 -->
+    <delete id="permanentlyDeleteReceivedMessages" parameterType="map">
+        DELETE FROM TB_MESSAGE_RECEPTION
+        WHERE RCVER = #{userId}
+          AND RECPTN_NO IN
+          <foreach item="id" collection="ids" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+    </delete>
+
+    <!-- 추가: 직원 검색 쿼리 -->
+    <select id="selectEmployeesByKeyword" parameterType="String" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+        SELECT 
+             e.EMPL_CODE,
+             e.EMPL_NM,
+             e.DEPT_CODE,
+             e.CLSF_CODE,
+             d.DEPT_NM,
+             c.CLSF_NM
+        FROM TB_EMPLOYEE e
+        LEFT JOIN TB_DEPARTMENT d ON e.DEPT_CODE = d.DEPT_CODE
+        LEFT JOIN TB_CLASS_OF_POSITION c ON e.CLSF_CODE = c.CLSF_CODE
+        WHERE e.EMPL_NM LIKE '%' || #{keyword} || '%'
+    </select>
+    
+    
+    <select id="countUnreadMessages" resultType="int">
+	    SELECT COUNT(*)
+	    FROM TB_MESSAGE_RECEPTION r
+	    WHERE r.RCVER = #{userId}
+	    AND r.MESSAGE_STTUS = 'N' 
+	</select>
+
+    
+
+</mapper>

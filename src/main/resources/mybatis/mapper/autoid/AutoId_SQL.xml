@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.servicemanagement.autoid.mapper.AutoIdMapper">
+
+
+	<select id="getNoIdEmplCount">
+		select
+			count(empl_code)
+		from
+			tb_employee
+		where
+			mber_id is null	
+	</select>
+	
+	<select id="getNoIdEmplList" parameterType="kr.or.batirplan.common.vo.PaginationInfoVO" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+		select
+			b.*
+		from
+			(select
+				  a.*
+				, ROW_NUMBER() OVER (ORDER BY a.empl_code DESC) AS rnum
+			   from
+				 (select
+						empl_code, empl_nm, dept_code, clsf_code, encpn
+				    from
+						tb_employee
+					where
+						mber_id is null	
+			    order by
+						empl_code) a ) b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<select id="getNoIdCcpyCount">
+			select
+				count(ccpy_code)
+			from
+				tb_cooperation_company
+			where
+				mber_id is null	
+	</select>
+		
+	<select id="getNoIdCcpyList" parameterType="kr.or.batirplan.common.vo.PaginationInfoVO" resultType="kr.or.batirplan.cooperationcom.vo.CooperationcomVO">
+	    SELECT
+	         b.ccpy_code         
+	       , b.charger           
+	       , b.ccpy_nm           
+	       , b.bizrno            
+	       , b.ccpy_telno        
+	       , b.ccpy_email        
+	       , b.ccpy_adres        
+	       , b.ccpy_detail_adres 
+	       , b.ccpy_cl           
+	       , e.empl_nm           AS chargerNm
+	    FROM (
+	         SELECT
+	              a.*
+	            , ROW_NUMBER() OVER (ORDER BY a.ccpy_code DESC) AS rnum
+	         FROM (
+	           SELECT
+	                ccpy_code
+	              , charger
+	              , ccpy_nm
+	              , bizrno
+	              , ccpy_telno
+	              , ccpy_email
+	              , ccpy_adres
+	              , ccpy_detail_adres
+	              , ccpy_cl
+	           FROM tb_cooperation_company
+	           WHERE mber_id IS NULL
+	         ) a
+	    ) b
+	    LEFT JOIN tb_employee e
+	      ON b.charger = e.empl_code
+	    <![CDATA[
+	       WHERE b.rnum >= #{startRow}
+	         AND b.rnum <= #{endRow}
+	    ]]>
+	</select>
+
+	<insert id="autoMberProcess" parameterType="kr.or.batirplan.security.vo.MemberVO">
+		INSERT INTO tb_member (
+			  MBER_ID
+			, MBER_PASSWORD
+			, SE_CODE
+			, ENABLED)
+		VALUES (
+			  #{mberId}
+			, #{mberPassword}
+			, #{seCode}
+			, #{enabled}
+			 )
+	</insert>
+	
+	<update id="autoSetEmplId" parameterType="String">
+		update
+			tb_employee
+		set
+			mber_id = #{empCode}
+		where
+			empl_code = #{emplCode}
+	</update>
+	
+	<insert id="autoSetEmplBasicAuthor" parameterType="String">
+		INSERT INTO tb_member_authority
+			(
+			  MBER_AUTHOR /* 권한 명 */
+			, MBER_ID     /* 회원 아이디 */
+			)
+		VALUES
+			(
+			  'ROLE_EMPL'	/* 사원 기본 권한 */
+			, #{empCode}	/* 사원 번호 */
+			)
+	</insert>
+	
+	<update id="autoSetCcpyId" parameterType="String">
+		update
+			tb_cooperation_company
+		set
+			mber_id = #{ccpyCode}
+		where
+			ccpy_code = #{ccpyCode}
+	</update>
+	
+	<insert id="autoSetCcpyBasicAuthor" parameterType="String">
+		INSERT INTO tb_member_authority
+			(
+			  MBER_AUTHOR /* 권한 명 */
+			, MBER_ID     /* 회원 아이디 */
+			)
+		VALUES
+			(
+			  'ROLE_CCPY'	/* 사원 기본 권한 */
+			, #{ccpyCode}	/* 사원 번호 */
+			)
+	</insert>
+	
+	<insert id="autoSetEmplDeptAuthor" parameterType="map">
+		INSERT INTO tb_member_authority
+			(
+			  MBER_AUTHOR /* 권한 명 */
+			, MBER_ID     /* 회원 아이디 */
+			)
+		VALUES
+			(
+			  #{deptAuthor}	/* 사원 기본 권한 */
+			, #{empCode}	/* 사원 번호 */
+			)
+	</insert>
+	
+	
+</mapper>

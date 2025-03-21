@@ -1,0 +1,28 @@
+<configuration>
+	<appender name="STDOUT"
+		class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{yyyyMMdd HH:mm:ss.SSS} [%thread] [%-5level] %logger{5} - %msg %n</pattern>
+		</encoder>
+	</appender>
+
+	<!-- 애플리케이션 로거 설정 -->
+    <logger name="kr.or.batirplan" level="INFO"/>
+
+	<!-- 스프링 프레임워크 로거 설정 -->
+    <logger name="org.springframework" level="INFO"/>
+
+	<!-- JDBC 관련 로거 설정 -->
+    <logger name="jdbc" level="OFF"/>
+    <logger name="jdbc.sqlonly" level="OFF"/>
+    <logger name="jdbc.sqltiming" level="DEBUG"/>
+    <logger name="jdbc.audit" level="OFF"/>
+    <logger name="jdbc.resultset" level="OFF"/>
+    <logger name="jdbc.resultsettable" level="DEBUG"/>
+    <logger name="jdbc.connection" level="OFF"/>
+    
+    <root level="INFO"  >
+        <appender-ref ref="STDOUT" />
+    </root>
+    
+</configuration>

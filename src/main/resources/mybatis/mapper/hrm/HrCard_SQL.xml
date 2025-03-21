@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.hrm.hrcard.mapper.HrCardMapper">
+	
+	<!-- 개별 사원 Insert -->
+	<insert id="insertEmployee" parameterType="kr.or.batirplan.employee.vo.EmployeeVO">
+		/* 사원 정보 하나를 Insert하는 쿼리 */
+		/* kr.or.batirplan.hrm.mapper.HrCardMapper-insertEmployee */
+	    <selectKey keyProperty="emplCode" resultType="String" order="BEFORE">
+	        SELECT 
+	            CASE 
+	                WHEN MAX(empl_code) IS NULL 
+	                THEN TO_CHAR(SYSDATE, 'YYMM') || '0001'
+	                ELSE LPAD(MAX(empl_code) + 1, 8, '0')
+	            END AS NEW_EMPL_CODE
+	        FROM tb_employee 
+	        WHERE empl_code LIKE TO_CHAR(sysdate, 'YYMM') || '%'
+	    </selectKey>
+	    INSERT INTO TB_EMPLOYEE (
+	          empl_code		/* 사원 코드 */
+	        , empl_nm       /* 사원 이름 */
+	        , brthdy        /* 생년월일 */
+	        , dept_code		/* 부서 코드 */
+	        , clsf_code		/* 직급 코드 */
+	        , email         /* 이메일 */
+	        , mbtlnum       /* 휴대폰 번호 */
+	        , sexdstn       /* 성별 */
+	        , zip           /* 우편번호 */
+	        , adres         /* 기본 주소 */
+	        , detailadres   /* 상세 주소 */
+	        , bank_code     /* 은행 코드 */
+	        , acnutno       /* 계좌 번호 */
+	        , encpn         /* 입사일 */
+	    ) VALUES (
+	          #{emplCode}
+	        , #{emplNm}
+	        , #{brthdy}
+	        , #{deptCode}
+	        , #{clsfCode}
+	        , #{email}
+	        , #{mbtlnum}
+	        , #{sexdstn}
+	        , #{zip}
+	        , #{adres}
+	        , #{detailadres}
+	        , #{bankCode}
+	        , #{acnutno}
+	        , #{encpn}
+	    )
+	</insert>
+	
+	
+	<!-- 프로필 이미지 저장 후 DB반영 -->
+	<update id="setEmployeEmplImageCours">
+		/* 사원 프로필 사진 경로 설정 쿼리*/
+		/* kr.or.batirplan.hrm.mapper.HrCardMapper-setEmployeEmplImageCours */
+		UPDATE 
+			tb_employee				
+		SET
+			profl_image_cours = #{proflImageCours}
+		WHERE 
+			empl_codE = #{emplCode}
+	</update>
+	
+	<!-- 개별 사원 정보 획득 -->
+	<select id="getEmployeeByEmplCode" parameterType="String" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+		/* 사원코드를 기준으로 사원정보를 얻는 쿼리 */
+		/* kr.or.batirplan.hrm.mapper.HrCardMapper-getEmployeeByEmplCode */
+		SELECT							
+			  empl_code		/* 사원 코드 */
+	        , empl_nm       /* 사원 이름 */
+	        , dept_code		/* 부서 코드 */
+	        , clsf_code		/* 직급 코드 */
+	        , brthdy        /* 생년월일 */
+	        , email         /* 이메일 */
+	        , mbtlnum       /* 휴대폰 번호 */
+	        , sexdstn       /* 성별 */
+	        , zip           /* 우편번호 */
+	        , adres         /* 기본 주소 */
+	        , detailadres   /* 상세 주소 */
+	        , bank_code     /* 은행 코드 */
+	        , acnutno       /* 계좌 번호 */
+	        , acnt_sttus_code /* 계좌 상태 코드 */
+	        , profl_image_cours /* 프로필 이미지 경로 */
+	        , mber_id		/* 회원 아이디 */
+	        , encpn         /* 입사일 */
+	        , retire_de		/* 퇴사일 */
+	        , hffc_sttus 	/* 재직 상태 */
+		FROM
+			tb_employee
+		WHERE
+			/* 파라미터와 사원 번호가 같은 사원 검색 */
+			empl_code = #{param}	
+	</select>
+	
+	<!-- 개별 사원 정보 수정 -->
+	<update id="modifyEmployee" parameterType="kr.or.batirplan.employee.vo.EmployeeVO">
+		/* 파라미터로 넘어온 사원코드에 해당하는 사원 정보를 업데이트 하는 쿼리 */
+		/* kr.or.batirplan.hrm.mapper.HrCardMapper-modifyEmployee */
+		UPDATE
+			tb_employee
+		<set>
+	        <if test="emplNm != null">empl_nm = #{emplNm},</if>
+	        <if test="brthdy != null">brthdy = #{brthdy},</if>
+	        <if test="deptCode != null">dept_code = #{deptCode},</if>
+	        <if test="clsfCode != null">clsf_code = #{clsfCode},</if>
+	        <if test="email != null">email = #{email},</if>
+	        <if test="mbtlnum != null">mbtlnum = #{mbtlnum},</if>
+	        <if test="sexdstn != null">sexdstn = #{sexdstn},</if>
+	        <if test="zip != null">zip = #{zip},</if>
+	        <if test="adres != null">adres = #{adres},</if>
+	        <if test="detailadres != null">detailadres = #{detailadres},</if>
+	        <if test="bankCode != null">bank_code = #{bankCode},</if>
+	        <if test="acnutno != null">acnutno = #{acnutno},</if>
+	        <if test="acntSttusCode != null">acnt_sttus_code = #{acntSttusCode},</if>
+	        <if test="proflImageCours != null">profl_image_cours = #{proflImageCours},</if>
+	        <if test="mberId != null">mber_id = #{mberId},</if>
+	        <if test="encpn != null">encpn = #{encpn},</if>
+	        <if test="retireDe != null">
+	        	retire_de = #{retireDe},
+	        	hffc_stts = '03',
+        	</if>
+    	</set>
+		WHERE
+			empl_code = #{emplCode}
+	</update>
+	
+	  <!-- 1) 전체 건수 조회 (검색 조건 적용) -->
+  	<select id="getEmployeeCount" parameterType="kr.or.batirplan.hrm.hrcard.vo.HrCardSearchVO" resultType="int">
+    	SELECT 
+    		count(*)	/* 전체 사원수 조회 */
+      	FROM 
+      		tb_employee
+     	WHERE 
+     		1=1
+     		/* SearchVO에 넘어온 값 필터링(조건) */
+	      	<include refid="searchEmployeeSQL"></include>
+	</select>
+
+
+  	<!-- 2) 리스트 조회 (페이징 + 검색 조건 적용) -->
+	<select id="getEmployeeList" parameterType="kr.or.batirplan.hrm.hrcard.vo.HrCardSearchVO" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+	  	SELECT 
+	    	*
+	    FROM 
+	    	(SELECT 
+	    		  A.*
+	            , ROW_NUMBER() OVER (ORDER BY A.EMPL_CODE DESC) AS rnum
+	         FROM
+	         	tb_employee A
+	         WHERE 
+	         	1=1
+	         	/* SearchVO에 넘어온 값 필터링(조건) */
+	         	<include refid="searchEmployeeSQL"></include>
+         	 ORDER BY A.empl_code DESC
+	      )
+	     WHERE 
+	     	rnum BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+	</select>
+	
+	
+	<sql id="searchEmployeeSQL">
+		 <!-- 사원코드 -->
+        <if test="searchVO.emplCode != null and searchVO.emplCode != ''">
+            AND EMPL_CODE LIKE '%' || #{searchVO.emplCode} || '%'
+        </if>
+        <!-- 사원명 -->
+        <if test="searchVO.emplNm != null and searchVO.emplNm != ''">
+            AND EMPL_NM LIKE '%' || #{searchVO.emplNm} || '%'
+        </if>
+        <!-- 부서 -->
+        <if test="searchVO.deptCode != null and searchVO.deptCode != ''">
+            AND DEPT_CODE = #{searchVO.deptCode}
+        </if>
+        <!-- 직급 -->
+        <if test="searchVO.clsfCode != null and searchVO.clsfCode != ''">
+            AND CLSF_CODE = #{searchVO.clsfCode}
+        </if>
+        <!-- 이메일 -->
+        <if test="searchVO.email != null and searchVO.email != ''">
+            AND EMAIL LIKE '%' || #{searchVO.email} || '%'
+        </if>
+        <!-- 휴대폰번호 -->
+        <if test="searchVO.mbtlnum != null and searchVO.mbtlnum != ''">
+            AND MBTLNUM LIKE '%' || #{searchVO.mbtlnum} || '%'
+        </if>
+        <!-- 입사일(ENCPN) 범위 검색 -->
+        <if test="searchVO.hireDateStart != null and searchVO.hireDateStart != ''">
+            <![CDATA[
+              AND ENCPN >= #{searchVO.hireDateStart}
+            ]]>
+        </if>
+        <if test="searchVO.hireDateEnd != null and searchVO.hireDateEnd != ''">
+            <![CDATA[
+              AND ENCPN <= #{searchVO.hireDateEnd}
+            ]]>
+        </if>
+
+        <!-- 퇴사일(RETIRE_DE) 범위 검색 -->
+        <if test="searchVO.retireDateStart != null and searchVO.retireDateStart != ''">
+            <![CDATA[
+              AND RETIRE_DE >= #{searchVO.retireDateStart}
+            ]]>
+        </if>
+        <if test="searchVO.retireDateEnd != null and searchVO.retireDateEnd != ''">
+            <![CDATA[
+              AND RETIRE_DE <= #{searchVO.retireDateEnd}
+            ]]>
+        </if>
+        <!-- 재직 상태 -->
+        <if test="searchVO.hffcSttus != null and searchVO.hffcSttus != ''">
+            AND HFFC_STTUS = #{searchVO.hffcSttus}
+        </if>
+	</sql>
+	
+	
+	<update id="emplRetireProcess" parameterType="String">
+		update
+			tb_employee
+		set
+			retire_de = TO_CHAR(sysdate, 'YYYYMMDD'),
+			hffc_sttus = '03'
+        where
+        	empl_code = #{emplCode}
+	</update>
+
+</mapper>

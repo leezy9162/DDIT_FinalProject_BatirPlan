@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.resrce.order.mapper.ReqMapperForScheduler">
+
+
+	<select id="getAutoReqTargetListBySttus" resultType="kr.or.batirplan.resrce.order.vo.AutoReqVO">
+		SELECT
+		      A.PRDLST_NO            AS prdlstNo
+		    , B.PRDLST_NM            AS prdlstNm
+		    , B.SAFE_INVNTRY_QY      AS safeInvntryQy
+		    , A.DAILY_DEMAND         AS dailyDemand
+		    , A.LEAD_TIME            AS leadTime
+		    , A.ORDER_COST           AS orderCost
+		    , A.HOLDING_COST         AS holdingCost
+		    , A.AUTO_ORDER_YN        AS autoOrderYn
+		    , B.CCPY_CODE            AS suplrCode
+		    , B.PRDLST_PRICE         AS unitPrice
+		    , B.NOW_INVNTRY_QY       AS nowInvntryQy
+		 FROM TB_AUTO_ORDER_PRODUCT_LIST A
+		 JOIN TB_PRODUCT_LIST B
+		   ON A.PRDLST_NO = B.PRDLST_NO
+		WHERE A.AUTO_ORDER_YN = 'Y'
+	</select>
+	
+	<select id="searchOrderProcessQty" resultType="int" parameterType="int">
+	    SELECT COALESCE(SUM(ORDR_QTY), 0)
+	      FROM TB_ORDER_DETAIL
+	     WHERE PRDLST_NO = #{prdlstNo}
+	       AND DE_STTUS = '1'
+	</select>
+	
+		
+	<select id="searchReqProcessQty" resultType="int" parameterType="int">
+	    SELECT COALESCE(SUM(REQ_QTY), 0)
+	      FROM TB_REQUEST_DETAIL
+	     WHERE PRDLST_NO = #{prdlstNo}
+	       AND REQ_DE_STTUS = '1'
+	</select>
+
+
+
+</mapper>
+
+

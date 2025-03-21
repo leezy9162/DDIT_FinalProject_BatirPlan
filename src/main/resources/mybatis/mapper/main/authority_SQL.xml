@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.servicemanagement.authority.mapper.MemberAuthorityMapper">
+
+    <!-- 🔹 전체 사용자 권한 조회 -->
+    <select id="findAllUsersWithRoles" resultType="kr.or.batirplan.servicemanagement.authority.vo.MemberAuthorityVO">
+        SELECT 
+            B.EMPL_NM AS emplName, 
+            MA.MBER_ID AS mberId,
+            D.DEPT_NM AS departmentName,
+            C.CLSF_NM AS classOfPosition,
+            LISTAGG(
+                CASE 
+                    WHEN MA.MBER_AUTHOR = 'ROLE_ADMIN' THEN '관리자'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_EMPL' THEN '사원'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_CCPY' THEN '협력 업체'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_DEPT_MNGMT' THEN '경영지원팀'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_DEPT_RESRCE' THEN '자원팀'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_DEPT_BILDNGPLANNG' THEN '건축기획팀'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_DEPT_IT' THEN 'IT팀'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_DEPT_FNNR' THEN '재무팀'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_RSPNBER_MNGMT' THEN '경영지원 관리자'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_RSPNBER_RESRCE' THEN '자원 관리자'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_RSPNBER_BILDNGPLANNG' THEN '건축기획 관리자'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_RSPNBER_IT' THEN 'IT 관리자'
+                    WHEN MA.MBER_AUTHOR = 'ROLE_RSPNBER_FNNR' THEN '재무 관리자'
+                    ELSE '일반 사용자'
+                END, ', '
+            ) WITHIN GROUP (ORDER BY MA.MBER_AUTHOR) AS mberAuthor
+        FROM TB_MEMBER_AUTHORITY MA
+    LEFT JOIN TB_EMPLOYEE B ON MA.MBER_ID = B.EMPL_CODE  -- ✅ 사원명 조회를 위해 조인
+    LEFT JOIN TB_DEPARTMENT D ON B.DEPT_CODE = D.DEPT_CODE
+    LEFT JOIN TB_CLASS_OF_POSITION C ON B.CLSF_CODE = C.CLSF_CODE
+    GROUP BY B.EMPL_NM, MA.MBER_ID, D.DEPT_NM, C.CLSF_NM  -- ✅ 그룹핑에 EMPL_NM 추가
+    ORDER BY B.EMPL_NM  
+    </select>
+
+    <!-- 🔹 특정 사용자의 모든 권한 조회 -->
+    <select id="getUserRoles" parameterType="String" resultType="String">
+        SELECT MBER_AUTHOR FROM TB_MEMBER_AUTHORITY WHERE MBER_ID = #{mberId}
+    </select>
+
+    <!-- 🔹 특정 사용자의 권한 추가 (중복 방지) -->
+    <insert id="addRoleToUser">
+        INSERT INTO TB_MEMBER_AUTHORITY (MBER_ID, MBER_AUTHOR)
+        VALUES (#{mberId}, #{role})
+    </insert>
+
+    <!-- 🔹 특정 사용자의 권한 개수 조회 -->
+    <select id="getUserRoleCount" parameterType="String" resultType="int">
+        SELECT COUNT(*) FROM TB_MEMBER_AUTHORITY WHERE MBER_ID = #{mberId}
+    </select>
+
+    <!-- 🔹 특정 사용자의 권한 제거 -->
+    <delete id="removeUserRole">
+        DELETE FROM TB_MEMBER_AUTHORITY
+        WHERE MBER_ID = #{mberId} 
+          AND MBER_AUTHOR = #{role}
+          AND MBER_AUTHOR != 'ROLE_ADMIN'
+    </delete>
+
+    <!-- 🔹 전체 유효한 권한 목록 조회 -->
+    <select id="getValidAuthorities" resultType="String">
+        SELECT DISTINCT MBER_AUTHOR FROM TB_MEMBER_AUTHORITY
+    </select>
+    
+    <!-- 🔹 특정 사용자가 변경할 수 있는 권한 목록 조회 (현재 권한 제외) -->
+<select id="getModifiableAuthorities" parameterType="String" resultType="String">
+    SELECT DISTINCT A.MBER_AUTHOR
+    FROM TB_MEMBER_AUTHORITY A
+    WHERE NOT EXISTS (
+        SELECT 1 FROM TB_MEMBER_AUTHORITY B
+        WHERE B.MBER_ID = #{mberId} 
+        AND A.MBER_AUTHOR = B.MBER_AUTHOR
+    )
+</select>
+
+<select id="searchUsersByKeyword" resultType="kr.or.batirplan.servicemanagement.authority.vo.MemberAuthorityVO">
+    SELECT EMPL_CODE, EMPL_NM, DEPT_CODE, CLSF_CODE
+    FROM TB_EMPLOYEE
+    WHERE EMPL_CODE LIKE CONCAT('%', #{keyword}, '%')
+       OR EMPL_NM LIKE CONCAT('%', #{keyword}, '%')
+</select>
+
+
+
+</mapper>

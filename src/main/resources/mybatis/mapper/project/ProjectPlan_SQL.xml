@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.project.projectplan.mapper.IProjectPlanMapper">
+
+	<insert id="insertProject" parameterType="kr.or.batirplan.project.projectmanage.vo.ProjectVO">
+	
+		<selectKey keyProperty="prjctNo" resultType="int" order="BEFORE">
+			select
+				seq_project.nextval
+			from dual
+		</selectKey>
+	    INSERT INTO tb_project (
+	        prjct_no,
+	        charger,
+	        prjct_nm,
+	        prjct_ctgry,
+	        prjct_cn,
+	        prjct_budget,
+	        prjct_progrs_sttus,
+	        prjct_bgnde,
+	        prjct_endde,
+	        prjct_lc,
+	        prjct_progrs_at,
+	        plan_sttus
+	    ) VALUES (
+	        #{prjctNo},
+	        #{charger},
+	        #{prjctNm},
+	        #{prjctCtgry},
+	        #{prjctCn},
+	        #{prjctBudget},
+	        #{prjctProgrsSttus},
+	        #{prjctBgnde},
+	        #{prjctEndde},
+	        #{prjctLc},
+	        #{prjctProgrsAt},
+	        DEFAULT
+	    )
+	</insert>
+
+	<!-- 카테고리 값에 맞는 GROUP_CODE 찾기 -->
+    <select id="selectGroupCodeByCategory" parameterType="String" resultType="String">
+        SELECT GROUP_CODE
+        FROM TB_COMMONNESS_CODE_GROUP
+        WHERE GROUP_NM = #{category}
+    </select>
+
+    <!-- 해당 GROUP_CODE에 맞는 공정 정보 가져오기 (OUTPT_ORDR 오름차순) -->
+    <select id="selectCommonnessCodesByGroupCode" parameterType="String" resultType="kr.or.batirplan.common.vo.CommonnessCodeVO">
+        SELECT CODE, GROUP_CODE, CODE_NM, CODE_DC, OUTPT_ORDR
+        FROM TB_COMMONNESS_CODE
+        WHERE GROUP_CODE = #{groupCode}
+        ORDER BY OUTPT_ORDR ASC
+    </select>
+
+    <!-- 공정 정보 TB_PROCESS 테이블에 INSERT -->
+    <insert id="insertProcess" parameterType="kr.or.batirplan.project.projectmanage.vo.ProcessVO">
+	    INSERT INTO TB_PROCESS (
+	        PRJCT_NO, PROCS_NO, PROCS_NM, PROCS_ORDR, PROGRS_STTUS
+	    ) VALUES (
+	        #{prjctNo}, SEQ_PROCESS.NEXTVAL, #{procsNm}, #{procsOrdr}, #{progrsSttus}  <!-- 상태값 동적으로 받음 -->
+	    )
+	</insert>
+    
+    <select id="getProjectList" parameterType="map" resultType="kr.or.batirplan.project.projectmanage.vo.ProjectVO">
+	    SELECT p.*
+	    FROM tb_project p
+	    WHERE 1=1
+	      <if test="search != null and search != ''">
+	        AND p.prjct_nm LIKE '%' || #{search} || '%'
+	      </if>
+	    ORDER BY p.prjct_no DESC
+	    OFFSET #{offset} ROWS FETCH NEXT #{pageSize} ROWS ONLY
+  	</select>
+  	
+  	<select id="getProjectTotalCount" parameterType="map" resultType="int">
+	    SELECT COUNT(DISTINCT p.prjct_no)
+	    FROM tb_project p
+	    WHERE 1=1
+	      <if test="search != null and search != ''">
+	        AND p.prjct_nm LIKE '%' || #{search} || '%'
+	      </if>
+  	</select>
+    
+    <select id="getProjectDetail" parameterType="int" resultType="kr.or.batirplan.project.projectmanage.vo.ProjectVO">
+	    SELECT 
+	        prjct_no,
+	        charger,
+	        prjct_nm,
+	        prjct_ctgry,
+	        prjct_cn,
+	        prjct_budget,
+	        prjct_progrs_sttus,
+	        prjct_bgnde,
+	        prjct_endde,
+	        prjct_lc,
+	        prjct_progrs_at,
+	        spt_mngr,
+	        plan_sttus
+	    FROM tb_project
+	    WHERE prjct_no = #{prjctNo}
+	</select>
+	
+	<select id="getEmployeeNameByCode" resultType="String">
+	    SELECT empl_nm
+	    FROM tb_employee
+	    WHERE empl_code = #{charger}
+	</select>
+	
+	<select id="getEmployeeByCode" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+		SELECT empl_nm,
+			   dept_code,
+			   clsf_code,
+			   email,
+			   mbtlnum
+		FROM tb_employee
+		WHERE empl_code = #{sptMngr}
+	</select>
+	
+	<select id="getProcessListByProject" parameterType="int" resultType="kr.or.batirplan.project.projectmanage.vo.ProcessVO">
+	    SELECT 
+		    p.procs_no,
+		    p.prjct_no,
+		    p.procs_nm,
+		    p.procs_cn,
+		    p.procs_bgnde,
+		    p.procs_endde,
+		    p.progrs_sttus,
+		    p.kpi_at,
+		    p.procs_prgs,
+		    p.procs_ordr,
+		    s.CHKLST_SJ AS assignedChecklistTitle
+		FROM tb_process p
+		LEFT JOIN TB_PROCESS_SAFETY_CHECK_LIST pc
+		    ON p.procs_no = pc.procs_no AND p.prjct_no = pc.prjct_no
+		LEFT JOIN TB_SAFETY_CHECK_LIST s
+		    ON TRIM(pc.PROCS_CHKLST_SJ) = TRIM(s.CHKLST_SJ)
+		WHERE p.prjct_no = #{prjctNo}
+		ORDER BY p.procs_ordr
+	</select>
+	
+	<update id="updateSiteManager">
+	    UPDATE TB_PROJECT
+	    SET spt_mngr = #{emplCode}  <!-- 담당자의 사원 코드 (emplCode)로 업데이트 -->
+	    WHERE prjct_no = #{prjctNo}  <!-- 프로젝트 번호를 기준으로 -->
+	</update>
+	
+	<update id="deleteSiteManager">
+	    UPDATE TB_PROJECT
+	    SET spt_mngr = NULL  <!-- 담당자 코드 제거 -->
+	    WHERE prjct_no = #{prjctNo}
+	</update>
+	
+	<update id="updateProcessStatus">
+        UPDATE TB_PROCESS
+        SET PROGRS_STTUS = #{progrsSttus}
+        WHERE PROCS_NO = #{procsNo}
+    </update>
+    
+    <select id="getEmployeeDetails" resultType="String">
+    	SELECT empl_nm, dept_code, clsf_code, email, mbtlnum
+	    FROM tb_employee
+	    WHERE empl_code = #{emplCode}
+    </select>
+    
+    <select id="getDeclarationList" resultType="kr.or.batirplan.project.projectplan.vo.DeclarationVO">
+	    SELECT 
+	        d.dclrt_no,
+	        d.prjct_no,
+	        d.dclrt_sj,
+	        d.writng_dt,
+	        d.confm_at,
+	        d.confm_dt,
+	        d.total_amount,
+	        p.prjct_nm  -- 프로젝트명 추가
+	    FROM 
+	        tb_basis_product_list_declaration d
+	    JOIN 
+	        tb_project p ON d.prjct_no = p.prjct_no  -- 프로젝트 테이블과 조인
+	    ORDER BY 
+	        d.dclrt_no
+	</select>
+	
+	<insert id="insertDeclaration" parameterType="map">
+        <selectKey keyProperty="dclrtNo" resultType="int" order="BEFORE">
+            SELECT seq_declaration.nextval
+            FROM dual
+        </selectKey>
+        INSERT INTO TB_BASIS_PRODUCT_LIST_DECLARATION (
+            dclrt_no, prjct_no, dclrt_sj, writng_dt, confm_at, confm_dt, total_amount
+        ) VALUES (
+            #{dclrtNo}, #{prjctNo}, #{dclrtSj}, SYSDATE, 'N', NULL, #{totalAmount}
+        )
+    </insert>
+    
+    <insert id="insertDeclarationProduct" parameterType="map">
+        INSERT INTO TB_DECLARATION_PRODUCT_LIST (
+            dclrt_no, prdlst_no, prdlst_qy
+        ) VALUES (
+            #{declarationNo}, #{prdlstNo}, #{qty}
+        )
+    </insert>
+    
+    <select id="getLastInsertedDeclarationNo" resultType="int">
+        SELECT seq_declaration.currval FROM dual
+    </select>
+    
+    <select id="getFirstProcessNo" parameterType="int" resultType="int">
+	    SELECT procs_no
+	    FROM tb_process
+	    WHERE prjct_no = #{prjctNo}
+	    ORDER BY procs_ordr ASC
+	    FETCH FIRST 1 ROWS ONLY
+	</select>
+	
+	<update id="updateProjectPlanStatus" parameterType="map">
+        UPDATE TB_PROJECT
+        SET plan_sttus = #{planStatus}  <!-- 프로젝트 상태를 받아서 업데이트 -->
+        WHERE prjct_no = #{prjctNo}     <!-- 해당 프로젝트 번호를 기준으로 업데이트 -->
+    </update>
+    
+    <select id="getDeclarationDetail" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.DeclarationVO">
+	    SELECT dclrt_no, prjct_no, dclrt_sj, writng_dt, confm_at, 
+	           confm_dt, total_amount
+	    FROM TB_BASIS_PRODUCT_LIST_DECLARATION
+	    WHERE dclrt_no = #{dclrtNo}
+	</select>
+    
+    <select id="getDeclarationProductList" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.DeclarationProductVO">
+	    SELECT 
+	        dpl.PRDLST_NO AS prdlstNo,
+	        dpl.PRDLST_QY AS prdlstQy,
+	        p.PRDLST_NM AS prdlstNm,
+	        p.PRDLST_PRICE AS prdlstPrice,
+	        (p.PRDLST_PRICE * dpl.PRDLST_QY) AS totalAmount
+	    FROM TB_DECLARATION_PRODUCT_LIST dpl
+	    JOIN TB_PRODUCT_LIST p ON dpl.PRDLST_NO = p.PRDLST_NO
+	    WHERE dpl.DCLRT_NO = #{dclrtNo}
+	</select>
+	
+	<select id="getDeclarationForProject" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.DeclarationVO">
+	    SELECT 
+	        dclrt_no,
+	        prjct_no,
+	        dclrt_sj,
+	        writng_dt,
+	        confm_at,
+	        confm_dt,
+	        total_amount
+	    FROM TB_BASIS_PRODUCT_LIST_DECLARATION
+	    WHERE prjct_no = #{prjctNo}
+	</select>
+	
+	<select id="getBidList" resultType="kr.or.batirplan.project.projectplan.vo.BidVO">
+		SELECT 
+	        B.PBLANC_NO,
+	        B.PRJCT_NO,
+	        B.PROCS_NO,
+	        B.PBLANC_WRTER,
+	        E.EMPL_NM AS pblancWrterName,  <!-- 사원 이름 가져오기 -->
+	        B.PBLANC_SE,
+	        B.PBLANC_SJ,
+	        B.DEMAND_CND_CN,
+	        B.PBLANC_AMOUNT,
+	        B.PBLANC_BGNDE,
+	        B.PBLANC_ENDDE,
+	        B.PROGRS_STTUS
+	    FROM TB_BID_PUBLIC_ANNOUNCEMENT B
+	    LEFT JOIN TB_EMPLOYEE E ON B.PBLANC_WRTER = E.EMPL_CODE
+	    ORDER BY B.PBLANC_NO DESC  
+	</select>
+	
+	<insert id="insertBid" parameterType="kr.or.batirplan.project.projectplan.vo.BidVO">
+	    <!-- 입찰 공고 번호 생성: 시퀀스 사용 (예: seq_bid_public_announcement) -->
+	    <selectKey keyProperty="pblancNo" resultType="int" order="BEFORE">
+	        SELECT seq_bid.nextval FROM dual
+	    </selectKey>
+	    INSERT INTO TB_BID_PUBLIC_ANNOUNCEMENT (
+	        PBLANC_NO,
+	        PRJCT_NO,
+	        PROCS_NO,
+	        PBLANC_WRTER,
+	        PBLANC_SE,
+	        PBLANC_SJ,
+	        DEMAND_CND_CN,
+	        PBLANC_AMOUNT,
+	        PBLANC_BGNDE,
+	        PBLANC_ENDDE
+	    ) VALUES (
+	        #{pblancNo},
+	        #{prjctNo},
+	        #{procsNo},
+	        #{pblancWrter},
+	        '01',
+	        #{pblancSj},
+	        #{demandCndCn},
+	        #{pblancAmount},
+	        TO_DATE(#{pblancBgnde}, 'YYYY-MM-DD'),
+	        TO_DATE(#{pblancEndde}, 'YYYY-MM-DD')
+	    )
+	</insert>
+	
+	<select id="getBidDetail" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.BidVO">
+	    SELECT 
+	        PBLANC_NO,
+	        PRJCT_NO,
+	        PROCS_NO,
+	        PBLANC_WRTER,
+	        PBLANC_SE,
+	        PBLANC_SJ,
+	        DEMAND_CND_CN,
+	        PBLANC_AMOUNT,
+	        PBLANC_BGNDE,
+	        PBLANC_ENDDE,
+	        PROGRS_STTUS
+	    FROM TB_BID_PUBLIC_ANNOUNCEMENT
+	    WHERE PBLANC_NO = #{pblancNo}
+	</select>
+	
+	<select id="getBidForProject" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.BidVO">
+		SELECT
+			pblanc_no,
+			prjct_no,
+			procs_no,
+			pblanc_wrter,
+			pblanc_se,
+			pblanc_sj,
+			demand_cnd_cn,
+			pblanc_amount,
+			pblanc_bgnde,
+			pblanc_endde,
+			progrs_sttus
+		FROM
+			tb_bid_public_announcement
+		WHERE
+			prjct_no = #{prjctNo}
+		ORDER BY pblanc_no DESC
+	</select>
+	
+	<select id="getBidForProcess" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.BidVO">
+	    SELECT 
+	        PBLANC_NO,
+	        PRJCT_NO,
+	        PROCS_NO,
+	        PBLANC_WRTER,
+	        PBLANC_SE,
+	        PBLANC_SJ,
+	        DEMAND_CND_CN,
+	        PBLANC_AMOUNT,
+	        PBLANC_BGNDE,
+	        PBLANC_ENDDE,
+	        PROGRS_STTUS
+	    FROM TB_BID_PUBLIC_ANNOUNCEMENT
+	    WHERE PROCS_NO = #{procsNo}
+	</select>
+	
+	<select id="getQuotationList" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.PriceQuotationVO">
+	    SELECT 
+	        PRQUDO_NO, 
+	        CMPNY_NM, 
+	        RPRSNTV_NM, 
+	        BIZRNO, 
+	        CMPNY_TELNO, 
+	        MBTLNUM, 
+	        PRQUDO_SJ, 
+	        PRQUDO_CN, 
+	        WRITNG_DT,
+	        CONFM_AT
+	    FROM TB_PRICE_QUOTATION_DOCUMENT
+	    WHERE PBLANC_NO = #{pblancNo}
+	</select>
+	
+	<select id="getQuotationDetail" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.PriceQuotationVO">
+	    SELECT 
+	        PRQUDO_NO, 
+	        PBLANC_NO,   <!-- 추가 -->
+	        CMPNY_NM, 
+	        RPRSNTV_NM, 
+	        BIZRNO, 
+	        CMPNY_TELNO, 
+	        MBTLNUM, 
+	        PRQUDO_SJ, 
+	        PRQUDO_CN, 
+	        WRITNG_DT,
+	        CONFM_AT
+	    FROM TB_PRICE_QUOTATION_DOCUMENT
+	    WHERE PRQUDO_NO = #{prqudoNo}
+	</select>
+
+	<select id="isQuotationApproved" resultType="boolean">
+	    SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+	    FROM TB_PRICE_QUOTATION_DOCUMENT
+	    WHERE PBLANC_NO = #{pblancNo} AND CONFM_AT = 'Y'
+	</select>
+
+    <!-- 견적서 승인 처리 -->
+    <update id="approveQuotation" parameterType="int">
+        UPDATE TB_PRICE_QUOTATION_DOCUMENT
+        SET CONFM_AT = 'Y'
+        WHERE PRQUDO_NO = #{prqudoNo} AND CONFM_AT = 'N'
+    </update>
+    
+    <select id="getApprovedQuotationCount" parameterType="int" resultType="int">
+	    SELECT COUNT(*)
+	    FROM TB_PRICE_QUOTATION_DOCUMENT
+	    WHERE PBLANC_NO = #{pblancNo} AND CONFM_AT = 'Y'
+	</select>
+	
+	<select id="getApprovedQuotation" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.PriceQuotationVO">
+	    SELECT 
+	        PRQUDO_NO, 
+	        PBLANC_NO,        <!-- 입찰 공고 번호를 포함 -->
+	        CMPNY_NM, 
+	        RPRSNTV_NM, 
+	        BIZRNO, 
+	        CMPNY_TELNO, 
+	        MBTLNUM, 
+	        PRQUDO_SJ, 
+	        PRQUDO_CN, 
+	        WRITNG_DT,
+	        CONFM_AT
+	    FROM TB_PRICE_QUOTATION_DOCUMENT
+	    WHERE PBLANC_NO = #{pblancNo} 
+	      AND CONFM_AT = 'Y'
+	</select>
+	
+	<select id="getProcessByNo" parameterType="int" resultType="kr.or.batirplan.project.projectmanage.vo.ProcessVO">
+	    SELECT 
+	        procs_no,
+	        prjct_no,
+	        procs_nm,
+	        procs_cn,
+	        procs_bgnde,
+	        procs_endde,
+	        progrs_sttus,
+	        kpi_at,
+	        procs_prgs,
+	        procs_ordr
+	    FROM TB_PROCESS
+	    WHERE PROCS_NO = #{procsNo}
+	</select>
+	
+	<update id="updateProcessDetails" parameterType="kr.or.batirplan.project.projectmanage.vo.ProcessVO">
+	    UPDATE TB_PROCESS
+	    SET 
+	        PROCS_CN = #{procsCn},
+	        PROCS_BGNDE = #{procsBgnde, jdbcType=DATE},
+	        PROCS_ENDDE = #{procsEndde, jdbcType=DATE}
+	    WHERE PROCS_NO = #{procsNo}
+	</update>
+	
+	<insert id="insertSafetyChecklist" parameterType="kr.or.batirplan.project.projectplan.vo.CheckListVO">
+	    <selectKey keyProperty="chklstNo" resultType="int" order="BEFORE">
+	         SELECT SEQ_CHECKLIST.NEXTVAL FROM dual
+	    </selectKey>
+	    INSERT INTO TB_SAFETY_CHECK_LIST (
+	         CHKLST_NO, CHKLST_SJ, WRITNG_DE, EMPL_CODE
+	    ) VALUES (
+	         #{chklstNo}, #{chklstSj}, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{emplCode}
+	    )
+	</insert>
+	
+	<insert id="insertSafetyCheckDetailItem" parameterType="map">
+	    <selectKey keyProperty="detailItemNo" resultType="int" order="BEFORE">
+	         SELECT SEQ_CHECKDETAIL.NEXTVAL FROM dual
+	    </selectKey>
+	    INSERT INTO TB_CHECK_LIST_DETAIL_ITEM (
+	         DETAIL_ITEM_NO, CHKLST_NO, DETAIL_ITEM_CN
+	    ) VALUES (
+	         #{detailItemNo}, #{chklstNo}, #{detailItemCn}
+	    )
+	</insert>
+	
+	<select id="getSafetyChecklistList" parameterType="String" resultType="kr.or.batirplan.project.projectplan.vo.CheckListVO">
+	    SELECT CHKLST_NO, CHKLST_SJ, WRITNG_DE, EMPL_CODE
+	    FROM TB_SAFETY_CHECK_LIST
+	    WHERE EMPL_CODE = #{emplCode}
+	    ORDER BY CHKLST_NO DESC
+	</select>
+	
+	<!-- 체크리스트 기본 정보 조회 -->
+	<select id="getSafetyChecklistDetail" parameterType="int" resultType="kr.or.batirplan.project.projectplan.vo.CheckListVO">
+	    SELECT c.CHKLST_NO,
+	           c.CHKLST_SJ,
+	           c.WRITNG_DE,
+	           c.EMPL_CODE,
+	           e.EMPL_NM
+	    FROM TB_SAFETY_CHECK_LIST c
+	    LEFT JOIN TB_EMPLOYEE e ON c.EMPL_CODE = e.EMPL_CODE
+	    WHERE c.CHKLST_NO = #{chklstNo}
+	</select>
+	
+	<!-- 체크리스트 세부 항목 조회 (각 항목의 내용) -->
+	<select id="getSafetyChecklistDetailItems" parameterType="int" resultType="string">
+	    SELECT DETAIL_ITEM_CN
+	    FROM TB_CHECK_LIST_DETAIL_ITEM
+	    WHERE CHKLST_NO = #{chklstNo}
+	    ORDER BY DETAIL_ITEM_NO ASC
+	</select>
+	
+	<!-- 1) 체크리스트 세부 항목 목록 가져오기 (이미 사용 중일 수 있음) -->
+    <select id="getChecklistDetailItems" parameterType="int" resultType="string">
+        SELECT DETAIL_ITEM_CN
+        FROM TB_CHECK_LIST_DETAIL_ITEM
+        WHERE CHKLST_NO = #{chklstNo}
+        ORDER BY DETAIL_ITEM_NO
+    </select>
+    
+    <!-- 2) TB_PROCESS_SAFETY_CHECK_LIST Insert -->
+    <insert id="insertProcessChecklist" parameterType="map">
+	    <selectKey keyProperty="procsChklstNo" resultType="int" order="BEFORE">
+	        SELECT SEQ_PROCESS_CHECKLIST.NEXTVAL FROM DUAL
+	    </selectKey>
+	    INSERT INTO TB_PROCESS_SAFETY_CHECK_LIST (
+	        PROCS_CHKLST_NO,
+	        PROCS_NO,
+	        PRJCT_NO,
+	        PROCS_CHKLST_SJ
+	    ) VALUES (
+	        #{procsChklstNo},
+	        #{procsNo},
+	        #{prjctNo},
+	        (
+	            SELECT UPPER(TRIM(CHKLST_SJ))
+	            FROM TB_SAFETY_CHECK_LIST
+	            WHERE CHKLST_NO = #{chklstNo}
+	        )
+	    )
+	</insert>
+
+    
+    <!-- 3) TB_PROCESS_SAFETY_CHECK_LIST_DETAIL Insert -->
+    <insert id="insertProcessChecklistDetail" parameterType="map">
+        <!-- 디테일 PK 시퀀스 -->
+        <selectKey keyProperty="procsChklstDetailNo" resultType="int" order="BEFORE">
+            SELECT SEQ_PROCESS_CHECKDETAIL.NEXTVAL FROM DUAL
+        </selectKey>
+        
+        INSERT INTO TB_PROCESS_SAFETY_CHECK_LIST_DETAIL (
+            PROCS_CHKLST_DETAIL_NO,
+            PROCS_CHKLST_NO,
+            PROCS_NO,
+            PRJCT_NO,
+            PROCS_CHKLST_DETAIL_CN
+        ) VALUES (
+            #{procsChklstDetailNo},
+            #{procsChklstNo},
+            #{procsNo},
+            #{prjctNo},
+            #{detailItem}
+        )
+    </insert>
+    
+    <select id="selectProcessChecklistId" parameterType="map" resultType="int">
+	    SELECT PROCS_CHKLST_NO
+	    FROM TB_PROCESS_SAFETY_CHECK_LIST
+	    WHERE PROCS_NO = #{procsNo} AND PRJCT_NO = #{prjctNo}
+	</select>
+    
+    <update id="updateProcessChecklist" parameterType="map">
+	    UPDATE TB_PROCESS_SAFETY_CHECK_LIST
+	    SET PROCS_CHKLST_SJ = (
+	        SELECT UPPER(TRIM(CHKLST_SJ))
+	        FROM TB_SAFETY_CHECK_LIST
+	        WHERE CHKLST_NO = #{chklstNo}
+	    )
+	    WHERE PROCS_CHKLST_NO = #{procsChklstNo}
+	</update>
+    
+    <delete id="deleteProcessChecklistDetails" parameterType="int">
+	    DELETE FROM TB_PROCESS_SAFETY_CHECK_LIST_DETAIL
+	    WHERE PROCS_CHKLST_NO = #{procsChklstNo}
+	</delete>
+	
+	<select id="getAssignedChecklistMapping" parameterType="int" resultType="map">
+	    SELECT p.PROCS_NO AS procsNo, s.CHKLST_NO AS chklstNo
+	    FROM TB_PROCESS_SAFETY_CHECK_LIST p
+	    JOIN TB_SAFETY_CHECK_LIST s 
+	      ON UPPER(TRIM(p.PROCS_CHKLST_SJ)) = UPPER(TRIM(s.CHKLST_SJ))
+	    WHERE p.PRJCT_NO = #{prjctNo}
+	</select>
+	
+	<delete id="deleteProcessChecklist" parameterType="int">
+	    DELETE FROM TB_PROCESS_SAFETY_CHECK_LIST
+	    WHERE PROCS_CHKLST_NO = #{procsChklstNo}
+	</delete>
+	
+	<update id="updateProjectProgressStatus" parameterType="map">
+	    UPDATE TB_PROJECT
+	    SET prjct_progrs_sttus = #{progressStatus}
+	    WHERE prjct_no = #{prjctNo}
+	</update>
+	
+	
+		<!-- 협력업체 사업자 번호 존재 여부 확인 -->
+	<select id="checkCooperationCompanyByBizrno" parameterType="string" resultType="int">
+	    SELECT COUNT(*)
+	    FROM TB_COOPERATION_COMPANY
+	    WHERE BIZRNO = #{bizrno}
+	</select>
+	
+	<!-- 협력업체 코드 자동 생성 -->
+	<select id="generateCooperationCompanyCode" resultType="string">
+	    SELECT 
+	        CASE 
+	            WHEN MAX(SUBSTR(ccpy_code, 7, 4)) IS NULL 
+	                THEN 'C' || TO_CHAR(SYSDATE, 'YYMM') || '0001'
+	            ELSE 'C' || TO_CHAR(SYSDATE, 'YYMM') || LPAD(MAX(SUBSTR(ccpy_code, 7, 4)) + 1, 4, '0') 
+	        END 
+	    FROM TB_COOPERATION_COMPANY 
+	    WHERE ccpy_code LIKE 'C' || TO_CHAR(SYSDATE, 'YYMM') || '%'
+	</select>
+	
+	<!-- 협력업체 정보 삽입 -->
+	<insert id="insertCooperationCompany" parameterType="map">
+	    INSERT INTO TB_COOPERATION_COMPANY (
+	        CCPY_CODE, CCPY_NM, BIZRNO, CHARGER, CCPY_TELNO, CCPY_EMAIL, 
+	        CCPY_ADRES, CCPY_DETAIL_ADRES, CCPY_CL, MBER_ID, BANK_CODE, ACNUTNO
+	    ) VALUES (
+	        #{ccpyCode}, #{ccpyNm}, #{bizrno}, #{charger}, #{ccpyTelno}, #{ccpyEmail}, 
+	        #{ccpyAdres}, #{ccpyDetailAdres}, #{ccpyCl}, #{mberId}, #{bankCode}, #{acnutno}
+	    )
+	</insert>
+	
+	<!-- 사업자 번호로 협력업체 코드 조회 -->
+	<select id="getCooperationCompanyCodeByBizrno" parameterType="string" resultType="string">
+	    SELECT CCPY_CODE
+	    FROM TB_COOPERATION_COMPANY
+	    WHERE BIZRNO = #{bizrno}
+	</select>
+	
+	
+	<!-- 입찰 공고 번호로 공정 번호 조회 -->
+	<select id="getProcessNoByPblancNo" parameterType="int" resultType="int">
+	    SELECT PROCS_NO
+	    FROM TB_BID_PUBLIC_ANNOUNCEMENT
+	    WHERE PBLANC_NO = #{pblancNo}
+	</select>
+	
+	<!-- 공정 테이블(TB_PROCESS)에 협력업체 코드 업데이트 -->
+	<update id="updateProcessWithCooperationCompany" parameterType="map">
+	    UPDATE TB_PROCESS
+	    SET CCPY_CODE = #{ccpyCode}
+	    WHERE PROCS_NO = #{procsNo}
+	</update>
+
+</mapper>

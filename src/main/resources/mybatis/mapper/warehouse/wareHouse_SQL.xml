@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.warehouse.mapper.IWarehouseMapper">
+
+    <!-- 📌 창고 목록 조회 (검색 기능 반영) -->
+    <select id="selectWarehouseList" parameterType="java.util.Map" resultType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        SELECT 
+            WRHOUS_CODE AS wrHousCode,         
+            WRHOUS_NM AS wrHousNm,             
+            WRHOUS_DETAIL_ADRES AS wrHousDetailAdres, 
+            WRHOUS_ZIP AS wrHousZip,          
+            WRHOUS_OPER_STTUS AS wrHousOperSttus,   
+            PARTCLR_MATTER AS partclrMatter       
+        FROM TB_WAREHOUSE
+        WHERE 1=1
+        <if test="wrHousNm != null and wrHousNm != ''">
+            AND WRHOUS_NM LIKE '%' || #{wrHousNm} || '%'  
+        </if>
+        <if test="wrHousOperSttus != null and wrHousOperSttus != ''">
+            AND WRHOUS_OPER_STTUS = #{wrHousOperSttus}
+        </if>
+        ORDER BY WRHOUS_NM ASC
+    </select>
+
+    <!-- 📌 창고 상세 조회 -->
+    <select id="selectWarehouseByCode" parameterType="java.lang.String" resultType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        SELECT 
+            WRHOUS_CODE AS wrHousCode,         
+            WRHOUS_NM AS wrHousNm,             
+            WRHOUS_DETAIL_ADRES AS wrHousDetailAdres, 
+            WRHOUS_ZIP AS wrHousZip,          
+            WRHOUS_OPER_STTUS AS wrHousOperSttus,   
+            PARTCLR_MATTER AS partclrMatter       
+        FROM TB_WAREHOUSE
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </select>
+
+    <!-- 📌 창고 정보 등록 -->
+    <insert id="insertWarehouse" parameterType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        <selectKey keyProperty="wrHousCode" resultType="java.lang.String" order="BEFORE">
+        	SELECT 'WH' || LPAD(SEQ_WAREHOUS.NEXTVAL, 3, '0') FROM DUAL
+	 	</selectKey>
+
+	    INSERT INTO TB_WAREHOUSE (
+	        WRHOUS_CODE,
+	        WRHOUS_NM,
+	        WRHOUS_DETAIL_ADRES,
+	        WRHOUS_ZIP,
+	        WRHOUS_OPER_STTUS,
+	        PARTCLR_MATTER
+	    ) VALUES (
+	        #{wrHousCode},  
+	        #{wrHousNm},
+	        #{wrHousDetailAdres},
+	        #{wrHousZip},
+	        #{wrHousOperSttus},
+	        #{partclrMatter}
+	    )
+    </insert>
+
+    <!-- 📌 창고 정보 수정 -->
+    <update id="updateWarehouse" parameterType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        UPDATE TB_WAREHOUSE
+        SET 
+            WRHOUS_NM = #{wrHousNm},
+            WRHOUS_DETAIL_ADRES = #{wrHousDetailAdres},
+            WRHOUS_ZIP = #{wrHousZip},
+            WRHOUS_OPER_STTUS = #{wrHousOperSttus},
+            PARTCLR_MATTER = #{partclrMatter}
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </update>
+
+    <!-- 📌 창고 폐쇄 (운영 상태 변경) -->
+    <update id="closeWarehouse" parameterType="java.lang.String">
+        UPDATE TB_WAREHOUSE
+        SET WRHOUS_OPER_STTUS = '02' -- '폐쇄' 상태
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </update>
+
+    <!-- 📌 창고 정보 삭제 -->
+    <delete id="deleteWarehouse" parameterType="java.lang.String">
+        DELETE FROM TB_WAREHOUSE WHERE WRHOUS_CODE = #{wrHousCode}
+    </delete>
+    
+    <!-- 📌 특정 창고에 있는 자재 개수 조회 -->
+    <select id="countMaterialsInWarehouse" parameterType="java.lang.String" resultType="int">
+        SELECT COUNT(*) 
+        FROM TB_WAREHOUSE_PRODUCT_LIST 
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </select>
+
+    <!-- 📌 마지막으로 삽입된 창고 코드 조회 (숫자 기준 정렬) -->
+    <select id="getLastInsertedWarehouseCode" resultType="java.lang.String">
+        SELECT WRHOUS_CODE 
+        FROM TB_WAREHOUSE 
+        ORDER BY TO_NUMBER(SUBSTR(WRHOUS_CODE, 3)) DESC 
+        FETCH FIRST 1 ROWS ONLY
+    </select>
+
+</mapper>

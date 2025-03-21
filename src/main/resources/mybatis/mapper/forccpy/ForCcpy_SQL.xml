@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.forccpy.mapper.ForCcpyMapper">
+
+	<select id="getReqCountByCcpyCode" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			tb_request
+		WHERE
+			SUPLR_CODE = #{param}
+			AND req_sttus = 1
+	</select>
+	
+	<select id="getRejectedReqCountByCcpyCode" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			tb_request
+		WHERE
+			SUPLR_CODE = #{param}
+			AND req_sttus = 4
+	</select>
+	
+	<select id="getOrderCountByCcpyCode" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			tb_order
+		WHERE
+			SUPLR_CODE = #{param}
+			AND ordr_sttus = 1
+	</select>
+	
+	<select id="getReqListByCcpyCode" parameterType="map" resultType="kr.or.batirplan.resrce.order.vo.ReqVO">
+		SELECT
+			*
+		FROM
+		(SELECT
+			ROWNUM AS rn, A.*
+		FROM
+		(SELECT                             
+			  tr.req_no                     /*   */
+			, tr.req_type                   /*   */
+			, tr.req_date                   /*   */
+			, tr.req_sttus                  /*   */
+			, tr.reqstr_code                /*   */
+			, te.empl_nm	as reqstrNm     /*   */
+		FROM
+			tb_request tr
+		LEFT OUTER JOIN 
+			tb_employee te
+		ON
+			tr.reqstr_code = te.empl_code
+		WHERE
+			SUPLR_CODE = #{ccpyCode}
+			AND req_sttus = 1
+		ORDER BY req_date DESC, req_no DESC
+			) A )
+		WHERE rn BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+	</select>
+	
+	<select id="getRejectedReqListByCcpyCode" parameterType="map" resultType="kr.or.batirplan.resrce.order.vo.ReqVO">
+		SELECT
+			*
+		FROM
+		(SELECT
+			ROWNUM AS rn, A.*
+		FROM
+		(SELECT                             
+			  tr.req_no                     /*   */
+			, tr.req_type                   /*   */
+			, tr.req_date                   /*   */
+			, tr.req_sttus                  /*   */
+			, tr.reqstr_code                /*   */
+			, te.empl_nm	as reqstrNm     /*   */
+		FROM
+			tb_request tr
+		LEFT OUTER JOIN 
+			tb_employee te
+		ON
+			tr.reqstr_code = te.empl_code
+		WHERE
+			SUPLR_CODE = #{ccpyCode}
+			AND req_sttus = 4
+		ORDER BY req_date DESC, req_no DESC
+			) A )
+		WHERE rn BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+	</select>
+	
+	<select id="getOrderListByCcpyCode" parameterType="map" resultType="kr.or.batirplan.resrce.order.vo.OrderVO">
+		SELECT
+			*
+		FROM
+		(SELECT
+			ROWNUM AS rn, A.*
+		FROM
+		(SELECT                             
+			  tbo.ordr_no
+			, tbo.req_no
+			, tbo.ordr_type
+			, tbo.ordr_date
+			, tbo.ordr_sttus
+			, tbo.completion_date
+			, tbo.total_amount
+			, tbo.expected_date
+			, tbo.suplr_code
+			, tbo.reqstr_code
+			, tbo.remarks
+			, tbo.cancel_reason
+			, te.empl_nm	as reqstrNm
+		FROM
+			tb_order tbo
+		LEFT OUTER JOIN 
+			tb_employee te
+		ON
+			tbo.reqstr_code = te.empl_code
+		WHERE
+			SUPLR_CODE = #{ccpyCode}
+			AND ordr_sttus = 1
+		ORDER BY ordr_date DESC, ordr_no DESC
+			) A )
+		WHERE rn BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+	</select>
+	
+	<update id="permitReq" parameterType="String">
+		UPDATE 
+			tb_request 
+		SET
+			req_sttus = '2'
+		WHERE
+			req_no = #{param}
+	</update>
+	
+	<select id="getOrderDetailsByOrdrNo" resultType="kr.or.batirplan.resrce.order.vo.OrderDetailVO">
+	SELECT
+		  ORDER_DE_NO
+		, ORDR_NO
+		, PRDLST_NO
+		, ORDR_QTY
+		, TOTAL_PRICE
+		, DE_STTUS
+		, RECEIVED_DATE
+		, (SELECT prdlst_nm FROM tb_product_list WHERE PRDLST_NO = A.PRDLST_NO) AS prdlstNm
+	FROM
+		tb_order_detail A
+	Where
+		ordr_no = #{param}
+	</select>
+	
+	
+	<update id="rejectReqByReqNo" parameterType="map">
+		UPDATE 
+			tb_request
+		SET
+			cancel_reason = #{reason},
+			req_sttus = '4'
+		WHERE
+			req_no = #{reqNo}
+	</update>
+</mapper>

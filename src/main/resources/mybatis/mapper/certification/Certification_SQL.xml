@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.hrm.certification.mapper.ICertificationMapper">
+
+    <!-- 사원 검색 -->
+    <select id="searchEmployees" parameterType="string" resultType="kr.or.batirplan.hrm.certification.vo.CertificationVO">
+	    SELECT * FROM tb_employee
+	    <where>
+		    <if test="searchKeyword != null and searchKeyword != ''">
+		        AND (empl_nm LIKE '%' || #{searchKeyword} || '%' 
+		             OR empl_code LIKE '%' || #{searchKeyword} || '%')
+		    </if>
+		    <if test="searchKeyword == null or searchKeyword == ''">
+		        AND 1 = 0  <!-- 기본적으로 검색어가 없으면 결과 없음 -->
+		    </if>
+		</where>
+	</select>
+
+    <!-- 증명서 발급 -->
+    <select id="getCertification" parameterType="map" resultType="kr.or.batirplan.hrm.certification.vo.CertificationVO">
+	    SELECT 
+	        EMPL_CODE AS emplCode,
+	        EMPL_NM AS emplNm,
+	        DEPT_CODE AS deptCode,
+	        CLSF_CODE AS clsfCode,
+	        BRTHDY AS brthdy,
+	        CONCAT(ADRES, ' ', DETAILADRES) AS adres,
+	        HFFC_STTUS AS hffcSttus,
+	        RETIRE_DE AS retireDe,
+	        ENCPN AS encpn,
+	        '바티르앤코' AS companyName,
+	        '이지용' AS ceoName,
+	        TO_CHAR(SYSDATE, 'YYYY-MM-DD') AS issuedDate
+	    FROM tb_employee
+	    WHERE EMPL_CODE = #{emplCode}
+	</select>
+
+</mapper>

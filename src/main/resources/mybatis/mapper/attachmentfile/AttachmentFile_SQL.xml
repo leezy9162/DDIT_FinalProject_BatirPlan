@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.attachmentfile.mapper.IAttachmentFileMapper">
+
+    <insert id="insertFile" parameterType="kr.or.batirplan.attachmentfile.vo.AttachmentFileVO">
+	    INSERT INTO TB_ATTACHMENT_FILE (
+	        FILE_NO,
+	        TABLE_TY,
+	        TABLE_NO,
+	        FILE_NM,
+	        FILE_MG,
+	        FILE_MIME,
+	        FILE_TY,
+	        FILE_COURS
+	    ) VALUES (
+	        #{fileNo},      <!-- 시퀀스 대신 직접 세팅 -->
+	        #{tableTy},
+	        #{tableNo},
+	        #{fileNm},
+	        #{fileMg},
+	        #{fileMime},
+	        #{fileTy},
+	        #{fileCours}
+	    )
+	</insert>
+
+</mapper>

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.batirplan.projectmanage.mapper.ProjectManageMapper">
+	
+	
+	
+	<update id="updatePrcsPrgs" parameterType="kr.or.batirplan.projectmanage.vo.ProjectManagePRCSVO">
+		UPDATE 
+			tb_process
+		SET
+			procs_prgs = #{procsPrgs}
+		WHERE
+			procs_no = #{procsNo}
+	</update>
+	
+	
+	
+	
+	<!-- ######################################################상세보기 쪽###################################################################### -->
+	
+    <resultMap id="projectManagePRCSResultMap" type="kr.or.batirplan.projectmanage.vo.ProjectManagePRCSVO">
+        <id property="procsNo" column="PROCS_NO" />
+        <result property="procsNo"       column="PROCS_NO" />
+        <result property="prjctNo"       column="PRJCT_NO" />
+        <result property="procsNm"       column="PROCS_NM" />
+        <result property="procsCn"       column="PROCS_CN" />
+        <result property="procsBgnde"    column="PROCS_BGNDE" />
+        <result property="procsEndde"    column="PROCS_ENDDE" />
+        <result property="progrsSttus"   column="PROGRS_STTUS" />
+        <result property="kpiAt"         column="KPI_AT" />
+        <result property="procsPrgs"     column="PROCS_PRGS" />
+        <result property="procsOrdr"     column="PROCS_ORDR" />
+        <result property="ccpyCode"      column="CCPY_CODE" />
+        <result property="pblancAmount"  column="PBLANC_AMOUNT" />
+        <result property="ccpyNm"        column="ccpyNm" />
+        <collection property="saftyList" ofType="kr.or.batirplan.projectmanage.vo.ProjectManageSFTYCHKVO"
+                    column="PROCS_NO" select="getProcessCheckListDByProceNo" />
+    </resultMap>
+	
+	<select id="getProjectInfoByPrjctNo" parameterType="int" resultType="kr.or.batirplan.projectmanage.vo.ProjectManagePJTVO">
+		SELECT
+			  PRJCT_NO
+			, CHARGER
+			, (SELECT empl_nm FROM tb_employee WHERE empl_code = CHARGER) AS chargerNm
+			, PRJCT_NM
+			, PRJCT_CTGRY
+			, PRJCT_CN
+			, PRJCT_BUDGET
+			, PRJCT_PROGRS_STTUS
+			, PRJCT_BGNDE
+			, PRJCT_ENDDE
+			, PRJCT_LC
+			, PRJCT_PROGRS_AT
+			, SPT_MNGR
+			, (SELECT empl_nm FROM tb_employee WHERE empl_code = SPT_MNGR) AS sptMngrNm
+			, PLAN_STTUS
+		FROM
+			tb_project
+		WHERE
+			prjct_no = #{param}
+	</select>
+	
+	<select id="getProcessListByPrjctNo" parameterType="int" resultMap="projectManagePRCSResultMap">
+		SELECT
+			  PROCS_NO
+			, PRJCT_NO
+			, PROCS_NM
+			, PROCS_CN
+			, PROCS_BGNDE
+			, PROCS_ENDDE
+			, PROGRS_STTUS
+			, KPI_AT
+			, PROCS_PRGS
+			, PROCS_ORDR
+			, A.CCPY_CODE
+			, NVL((SELECT PBLANC_AMOUNT FROM TB_BID_PUBLIC_ANNOUNCEMENT WHERE PROCS_NO = A.PROCS_NO), 0) AS pblanc_amount
+			, (SELECT ccpy_nm FROM tb_cooperation_company WHERE CCPY_CODE = A.CCPY_CODE) AS ccpyNm
+		FROM
+			tb_process A
+		WHERE
+			prjct_no = #{param}
+		ORDER BY
+			PROCS_ORDR ASC
+	</select>
+	
+	
+	<select id="getProcessCheckListDByProceNo" parameterType="int" resultType="kr.or.batirplan.projectmanage.vo.ProjectManageSFTYCHKVO">
+		SELECT
+		    tbscl.procs_chklst_no,
+		    tbscl.procs_chklst_sj,
+		    tpscld.procs_chklst_detail_no,
+		    tpscld.procs_chklst_no,
+		    tpscld.procs_no,
+		    tpscld.prjct_no,
+		    tpscld.procs_chklst_detail_cn
+		FROM
+		    tb_process_safety_check_list_detail  tpscld
+		LEFT OUTER JOIN
+		    tb_process_safety_check_list  tbscl
+		ON
+		    tpscld.procs_chklst_no = tbscl.procs_chklst_no
+		WHERE
+		    tpscld.procs_no = #{param}
+		ORDER BY
+		    tpscld.procs_chklst_detail_no asc
+	</select>
+<!-- 공정 VO에 넣어놓을까?	select
+*
+from
+TB_PROCESS_SAFETY_CHECK_LIST_DETAIL
+where
+PROCS_NO = '91'
+order by
+    PROCS_CHKLST_DETAIL_NO ASC
+ -->	
+	
+	
+	<!-- ###############################################################리스트쪽####################################################################################### -->
+	<sql id="searchSql">
+		<if test="searchVO.prjctNm != null and searchVO.prjctNm != ''">
+			AND tp.prjct_nm LIKE '%' || #{searchVO.prjctNm} || '%'
+		</if>
+		<if test="searchVO.chargerNm != null and searchVO.chargerNm != ''">
+			AND te.empl_nm LIKE '%' || #{searchVO.chargerNm} || '%'
+		</if>
+		<if test="searchVO.prjctProgrsSttus != null and searchVO.prjctProgrsSttus != ''">
+			AND tp.prjct_progrs_sttus = #{searchVO.prjctProgrsSttus}
+		</if>
+	</sql>
+	
+	
+	<select id="getProjectCount" parameterType="kr.or.batirplan.projectmanage.vo.ProjectManagePJTSearchVO" resultType="int">
+		SELECT
+			COUNT(TP.PRJCT_NO)
+		FROM
+			tb_project tp
+		LEFT OUTER JOIN
+			tb_employee te
+		ON
+			te.empl_code = tp.charger
+		WHERE
+			tp.prjct_progrs_sttus != '01'
+			<include refid="searchSql"/>
+	</select>
+	
+	<select id="getMyProjectCount" parameterType="string" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			tb_project
+		WHERE
+			prjct_progrs_sttus != '01'
+			AND (charger = #{param} OR spt_mngr = #{param})
+	</select>
+	
+	<select id="getProjectList" parameterType="map" resultType="kr.or.batirplan.projectmanage.vo.ProjectManagePJTVO">
+		SELECT
+			*
+		FROM
+		(SELECT ROWNUM AS rn, A.*
+		FROM
+		(SELECT
+		      tp.prjct_no
+		    , tp.charger
+		    , te.empl_nm AS chargerNm
+		    , tp.prjct_nm
+		    , tp.prjct_ctgry
+		    , tp.prjct_cn
+		    , tp.prjct_budget
+		    , tp.prjct_progrs_sttus
+		    , tp.prjct_bgnde
+		    , tp.prjct_endde
+		    , tp.prjct_lc
+		    , tp.prjct_progrs_at
+		    , tp.spt_mngr
+		    , (SELECT empl_nm FROM tb_employee TBE WHERE TBE.empl_code = TP.spt_mngr) AS sptMngrNm
+		    , tp.plan_sttus
+		FROM 
+			tb_project tp
+		LEFT OUTER JOIN 
+			tb_employee te
+		ON 
+			tp.charger = te.empl_code
+		WHERE
+		    tp.prjct_progrs_sttus != '01'			
+			<include refid="searchSql"/>
+		ORDER BY
+			tp.prjct_no desc , tp.prjct_bgnde desc) A )
+		WHERE rn BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+	</select>
+	
+	<select id="getMyProjectList" parameterType="map" resultType="kr.or.batirplan.projectmanage.vo.ProjectManagePJTVO">
+		SELECT
+			*
+		FROM
+		(SELECT ROWNUM AS rn, A.*
+		FROM
+		(SELECT
+		      tp.prjct_no
+		    , tp.charger
+		    , te.empl_nm AS chargerNm
+		    , tp.prjct_nm
+		    , tp.prjct_ctgry
+		    , tp.prjct_cn
+		    , tp.prjct_budget
+		    , tp.prjct_progrs_sttus
+		    , tp.prjct_bgnde
+		    , tp.prjct_endde
+		    , tp.prjct_lc
+		    , tp.prjct_progrs_at
+		    , tp.spt_mngr
+		    , (SELECT empl_nm FROM tb_employee TBE WHERE TBE.empl_code = TP.spt_mngr) AS sptMngrNm
+		    , tp.plan_sttus
+		FROM 
+			tb_project tp
+		LEFT OUTER JOIN 
+			tb_employee te
+		ON 
+			tp.charger = te.empl_code
+		WHERE
+		    tp.prjct_progrs_sttus != '01'			
+			AND (tp.charger = #{emplCode} OR tp.spt_mngr = #{emplCode})
+		ORDER BY
+			tp.prjct_no desc , tp.prjct_bgnde desc) A )
+		WHERE rn BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+	</select>
+
+</mapper>

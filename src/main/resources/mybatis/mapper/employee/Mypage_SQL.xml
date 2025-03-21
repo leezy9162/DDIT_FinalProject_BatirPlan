@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.employee.mapper.IMypageMapper">
+
+    <!-- 로그인한 사용자 정보 조회 -->
+    <select id="findEmployeeById" parameterType="String" resultType="kr.or.batirplan.employee.vo.EmployeeVO">
+        SELECT 
+            empl_code
+            , empl_nm			/* 사원명 */
+            , dept_code			/* 부서 코드 */
+            , clsf_code			/* 직급 코드 */
+            , brthdy			/* 생년월일 */
+            , email				/* 이메일 */
+            , mbtlnum			/* 휴대폰번호 */
+            , zip				/* 우편번호 */
+            , adres				/* 기본주소 */
+            , detailadres		/* 상세주소 */
+            , bank_code			/* 은행 코드 */
+            , acnutno			/* 계좌번호 */
+            , acnt_sttus_code	/* 계정 상태 코드 */
+            , profl_image_cours	/* 프로필 이미지 경로 */
+            , mber_id			/* 회원 아이디 */
+        FROM tb_employee
+        WHERE empl_code = #{emplCode}
+    </select>
+
+    <!-- 계좌 정보 업데이트 -->
+    <update id="updateAccountInfo">
+        UPDATE tb_employee
+        SET bank_code = #{bankCode}, acnutno = #{accountNumber}
+        WHERE empl_code = #{emplCode}
+    </update>
+    
+    <!-- 사원 이름으로 사원코드 조회 -->
+    <select id="selectEmpCodeByName" resultType="String" parameterType="String">
+    	SELECT empl_code
+        FROM tb_employee
+        WHERE empl_nm = #{emplName}
+    </select>
+
+</mapper>

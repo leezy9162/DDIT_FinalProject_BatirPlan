@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.batirplan.warehouse.mapper.WarehouseProductMapper">
+
+    <!-- 📌 특정 창고의 제품 목록 조회 -->
+    <select id="getProductsByWarehouse" parameterType="java.lang.String" resultType="kr.or.batirplan.warehouse.vo.WarehouseProductVO">
+        SELECT WRHOUS_CODE, PRDLST_NO, INVNTRY_QY, COALESCE(NEWEST_UPDT_DE, CURRENT_TIMESTAMP) AS newestUpdtDe
+        FROM TB_WAREHOUSE_PRODUCT_LIST
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </select>
+
+<!-- 📌 특정 창고의 자재 목록 조회 -->
+<select id="getMaterialsByWarehouse" parameterType="java.lang.String" resultType="kr.or.batirplan.warehouse.vo.WarehouseProductVO">
+    SELECT 
+        wp.WRHOUS_CODE, 
+        wp.PRDLST_NO, 
+        p.PRDLST_NM,      -- ✅ 자재명 추가
+        p.PRDLST_STNDRD,  -- ✅ 자재 규격 추가
+        p.PRDLST_UNIT,    -- ✅ 자재 단위 추가
+        wp.INVNTRY_QY, 
+        NVL(
+            TO_CHAR(TO_DATE(wp.NEWEST_UPDT_DE, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS'),
+            TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS')
+        ) AS NEWEST_UPDT_DE
+    FROM TB_WAREHOUSE_PRODUCT_LIST wp
+    JOIN TB_PRODUCT_LIST p 
+        ON wp.PRDLST_NO = p.PRDLST_NO  -- ✅ 자재 테이블 조인
+    WHERE wp.WRHOUS_CODE = #{wrHousCode}
+    ORDER BY p.PRDLST_NM ASC  -- ✅ 정렬 구문 수정
+</select>
+
+
+
+
+    <!-- 📌 전체 창고의 모든 제품 목록 조회 -->
+    <select id="getAllWarehouseProducts" resultType="kr.or.batirplan.warehouse.vo.WarehouseProductVO">
+        SELECT WRHOUS_CODE, PRDLST_NO, INVNTRY_QY, COALESCE(NEWEST_UPDT_DE, CURRENT_TIMESTAMP) AS newestUpdtDe
+        FROM TB_WAREHOUSE_PRODUCT_LIST
+    </select>
+
+    <!-- 📌 창고 정보 등록 -->
+    <insert id="insertWarehouse" parameterType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        INSERT INTO TB_WAREHOUSE (
+            WRHOUS_CODE, WRHOUS_NM, WRHOUS_LC, WRHOUS_DETAIL_ADRES, WRHOUS_ZIP, WRHOUS_OPER_STTUS, PARTCLR_MATTER
+        ) VALUES (
+            #{wrHousCode}, #{wrHousNm}, #{wrHousLc}, COALESCE(#{wrHousDetailAdres}, ''), #{wrHousZip}, #{wrHousOperSttus}, #{partclrMatter}
+        )
+    </insert>
+
+    <!-- 📌 가장 마지막에 삽입된 창고 코드 조회 -->
+    <select id="getLastInsertedWarehouseCode" resultType="java.lang.String">
+        SELECT WRHOUS_CODE 
+        FROM TB_WAREHOUSE 
+        ORDER BY WRHOUS_CODE DESC 
+        FETCH FIRST 1 ROW ONLY
+    </select>
+
+    <!-- 📌 창고 정보 수정 -->
+    <update id="updateWarehouse" parameterType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        UPDATE TB_WAREHOUSE
+        SET WRHOUS_NM = #{wrHousNm},
+            WRHOUS_LC = #{wrHousLc},
+            WRHOUS_DETAIL_ADRES = COALESCE(#{wrHousDetailAdres}, WRHOUS_DETAIL_ADRES),
+            WRHOUS_ZIP = #{wrHousZip},
+            WRHOUS_OPER_STTUS = #{wrHousOperSttus},
+            PARTCLR_MATTER = #{partclrMatter}
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </update>
+
+    <!-- 📌 창고 삭제 (재고가 없을 경우만 가능) -->
+    <delete id="deleteWarehouse" parameterType="java.lang.String">
+        DELETE FROM TB_WAREHOUSE
+        WHERE WRHOUS_CODE = #{wrHousCode}
+        AND NOT EXISTS (
+            SELECT 1 FROM TB_WAREHOUSE_PRODUCT_LIST WHERE WRHOUS_CODE = #{wrHousCode} AND INVNTRY_QY > 0
+        )
+    </delete>
+
+    <!-- 📌 창고 폐쇄 처리 (재고가 없을 경우만 가능) -->
+    <update id="closeWarehouse" parameterType="java.lang.String">
+        UPDATE TB_WAREHOUSE 
+        SET WRHOUS_OPER_STTUS = '02'
+        WHERE WRHOUS_CODE = #{wrHousCode}
+        AND NOT EXISTS (
+            SELECT 1 FROM TB_WAREHOUSE_PRODUCT_LIST WHERE WRHOUS_CODE = #{wrHousCode} AND INVNTRY_QY > 0
+        )
+    </update>
+
+    <!-- 📌 특정 창고에 보관된 자재 개수 조회 -->
+    <select id="countMaterialsInWarehouse" parameterType="java.lang.String" resultType="int">
+        SELECT COUNT(*) 
+        FROM TB_WAREHOUSE_PRODUCT_LIST 
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </select>
+
+    <!-- 📌 창고 목록 조회 (필터링 포함) -->
+    <select id="selectWarehouseList" parameterType="java.util.Map" resultType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        SELECT 
+            WRHOUS_CODE AS wrHousCode,         
+            WRHOUS_NM AS wrHousNm,             
+            WRHOUS_LC AS wrHousLc,             
+            COALESCE(WRHOUS_DETAIL_ADRES, '') AS wrHousDetailAdres, 
+            WRHOUS_ZIP AS wrHousZip,          
+            WRHOUS_OPER_STTUS AS wrHousOperSttus,   
+            PARTCLR_MATTER AS partclrMatter       
+        FROM TB_WAREHOUSE
+        WHERE 1=1
+        <if test="wrHousNm != null and wrHousNm != ''">
+            AND WRHOUS_NM LIKE CONCAT('%', #{wrHousNm}, '%')  
+        </if>
+        <if test="wrHousLc != null and wrHousLc != ''">
+            AND WRHOUS_LC LIKE CONCAT('%', #{wrHousLc}, '%')  
+        </if>
+        <if test="wrHousOperSttus != null and wrHousOperSttus != ''">
+            AND WRHOUS_OPER_STTUS = #{wrHousOperSttus}
+        </if>
+        ORDER BY WRHOUS_NM ASC
+    </select>
+
+    <!-- 📌 창고 코드로 창고 정보 조회 -->
+    <select id="selectWarehouseByCode" parameterType="java.lang.String" resultType="kr.or.batirplan.warehouse.vo.WarehouseVO">
+        SELECT 
+            WRHOUS_CODE AS wrHousCode,         
+            WRHOUS_NM AS wrHousNm,             
+            WRHOUS_LC AS wrHousLc,             
+            COALESCE(WRHOUS_DETAIL_ADRES, '') AS wrHousDetailAdres, 
+            WRHOUS_ZIP AS wrHousZip,          
+            WRHOUS_OPER_STTUS AS wrHousOperSttus,   
+            PARTCLR_MATTER AS partclrMatter       
+        FROM TB_WAREHOUSE
+        WHERE WRHOUS_CODE = #{wrHousCode}
+    </select>
+
+
+    <!-- 📌 특정 창고에 자재가 존재하는지 여부 확인 -->
+    <select id="hasMaterialsInWarehouse" parameterType="java.lang.String" resultType="boolean">
+        SELECT COUNT(*) > 0 
+        FROM TB_WAREHOUSE_PRODUCT_LIST 
+        WHERE WRHOUS_CODE = #{wrHousCode} 
+          AND INVNTRY_QY > 0
+    </select>
+
+    <!-- 📌 창고 폐쇄 가능 여부 확인 -->
+    <select id="canCloseWarehouse" parameterType="java.lang.String" resultType="boolean">
+        SELECT CASE WHEN COUNT(*) = 0 THEN TRUE ELSE FALSE END 
+        FROM TB_WAREHOUSE_PRODUCT_LIST 
+        WHERE WRHOUS_CODE = #{wrHousCode} 
+          AND INVNTRY_QY > 0
+    </select>
+
+
+</mapper>
